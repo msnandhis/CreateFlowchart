@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "@createflowchart/core": "workspace:*",
-    "openai": "^4.80.0"
+    "openai": "^4.80.0",
+    "@anthropic-ai/sdk": "^0.39.0"
   },
   "devDependencies": {
     "@createflowchart/tsconfig": "workspace:*",

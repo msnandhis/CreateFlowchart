@@ -23,10 +23,12 @@
 | **Database** | PostgreSQL | 16.x | Users, flows, versions, templates |
 | **Vector Search** | pgvector | 0.7+ | Semantic template search (cosine similarity) |
 | **ORM** | Drizzle ORM | latest | Type-safe queries, migrations, schema |
-| **Auth** | Auth.js (NextAuth v5) | 5.x | OAuth (GitHub, Google), JWT sessions |
-| **AI** | OpenAI / Gemini API | — | generate/analyze/improve/explain flows |
+| **Auth** | Better Auth | latest | OAuth (GitHub, Google), email/password, JWT sessions, Drizzle adapter |
+| **AI Gateway** | Multi-Provider (OpenRouter, OpenAI, Anthropic, xAI) | — | Priority-based fallback routing across providers |
 | **Embeddings** | OpenAI `text-embedding-3-small` | — | 1536-dim vectors for template search |
-| **Rate Limiting** | Upstash Redis | — | 10 AI gen/min/user |
+| **Queue** | BullMQ | 5.x | Background jobs: AI generation, export rendering, embedding generation |
+| **Cache/Queue Store** | Redis (self-hosted via Coolify) | 7.x | Rate limiting, BullMQ backing store, session cache, Yjs snapshot buffer |
+| **Rate Limiting** | Custom (Redis `INCR` + `EXPIRE`) | — | 10 AI gen/min/user, per-socket WS limits |
 | **Export** | `html-to-image` + `@react-pdf/renderer` | — | PNG, SVG, PDF, Mermaid, JSON |
 | **Monorepo** | Turborepo + pnpm | latest/9.x | Workspace orchestration, caching |
 | **Testing** | Vitest + Playwright | — | Unit/integration + E2E |
@@ -97,7 +99,7 @@ CreateFlowChart/
 │   │   │   │   ├── templates/[slug]/route.ts      → features/templates service
 │   │   │   │   ├── export/route.ts                → features/export service
 │   │   │   │   ├── actions/test/route.ts          → features/editor action service
-│   │   │   │   └── auth/[...nextauth]/route.ts    → shared/lib auth config
+│   │   │   │   └── auth/[...all]/route.ts         → shared/lib better-auth handler
 │   │   │   ├── layout.tsx                   # Root (fonts, providers, metadata)
 │   │   │   └── globals.css                  # Design tokens + resets
 │   │   │
@@ -232,8 +234,11 @@ CreateFlowChart/
 │   │   │   │   └── useLocalStorage.ts
 │   │   │   ├── lib/                   # Infrastructure
 │   │   │   │   ├── api-client.ts
-│   │   │   │   ├── auth-config.ts
+│   │   │   │   ├── auth.ts            # Better Auth server instance
+│   │   │   │   ├── auth-client.ts     # Better Auth client instance
 │   │   │   │   ├── db.ts
+│   │   │   │   ├── redis.ts           # ioredis connection
+│   │   │   │   ├── queue.ts           # BullMQ queue definitions
 │   │   │   │   └── rate-limit.ts
 │   │   │   └── stores/                # Global-only
 │   │   │       └── uiStore.ts
@@ -266,8 +271,15 @@ CreateFlowChart/
 │   │   │   └── index.ts
 │   │   ├── tsconfig.json
 │   │   └── package.json
-│   ├── ai/                            # AI prompts, pipeline, confidence, embeddings
+│   ├── ai/                            # AI multi-provider pipeline
 │   │   ├── src/
+│   │   │   ├── providers/             # Provider adapters
+│   │   │   │   ├── base.ts            # ProviderConfig interface
+│   │   │   │   ├── openrouter.ts      # OpenRouter (multi-model fallback)
+│   │   │   │   ├── openai.ts          # Direct OpenAI
+│   │   │   │   ├── anthropic.ts       # Direct Claude
+│   │   │   │   └── xai.ts             # Direct Grok
+│   │   │   ├── router.ts             # Priority-based provider routing + fallback
 │   │   │   ├── prompts/{generate,analyze,improve,explain}.ts
 │   │   │   ├── pipeline.ts
 │   │   │   ├── confidence.ts
@@ -367,17 +379,17 @@ Every module in the system imports `FlowGraphSchema` from `@createflowchart/core
 
 **Goal**: Full editor with sandbox/cloud modes, canvas, custom nodes, toolbar, "/" commands, auto-layout.
 
-### 2A — Database & Auth
+### 2A — Database, Auth & Infrastructure
 
-- [ ] **2.1** `packages/db/src/schema.ts`: Drizzle tables for `users`, `flows`, `flow_versions`
+- [ ] **2.1** `packages/db/src/schema.ts`: Drizzle tables for `users`, `sessions`, `accounts`, `flows`, `flow_versions` (Better Auth manages user/session/account tables via its Drizzle adapter)
 - [ ] **2.2** Run initial migration via Drizzle Kit
-- [ ] **2.3** `shared/lib/auth-config.ts`: Auth.js with GitHub + Google OAuth, JWT sessions
-- [ ] **2.4** `features/auth/`: LoginForm, SignupForm, AuthGuard, authStore
-- [ ] **2.5** Auth middleware for protected routes
-
-### 2B — Shared UI Components (`shared/ui/`)
-
-- [ ] **2.6** Button, Input, Modal, Toast, Badge, Dropdown — all CSS Modules, dark-mode-first
+- [ ] **2.3** `shared/lib/auth.ts`: Better Auth server instance with Drizzle adapter, GitHub + Google OAuth + email/password. `shared/lib/auth-client.ts`: client-side auth hooks (`useSession`, `signIn`, `signOut`)
+- [ ] **2.4** `app/api/auth/[...all]/route.ts`: catch-all route using `toNextJsHandler(auth)`
+- [ ] **2.5** `features/auth/`: LoginForm, SignupForm, AuthGuard (uses `useSession` from Better Auth client)
+- [ ] **2.6** Auth middleware (`middleware.ts`): protect `/dashboard`, `/editor/[flowId]` routes
+- [ ] **2.7** `shared/lib/redis.ts`: ioredis connection (self-hosted Redis via Coolify, `maxRetriesPerRequest: null`)
+- [ ] **2.8** `shared/lib/queue.ts`: BullMQ queue definitions (`ai-generation`, `export-render`, `embedding-generation`)
+- [ ] **2.9** `shared/lib/rate-limit.ts`: Redis-based rate limiter using `INCR` + `EXPIRE` (10 AI req/min/user)
 
 ### 2C — Editor Feature (`features/editor/`)
 
@@ -413,28 +425,45 @@ User drags node → React Flow onChange → fromReactFlowFormat() → validateFl
 
 **Goal**: Prompt→FlowGraph, analysis, improvements, explanations — all with confidence scoring.
 
-### 3A — AI Pipeline (`packages/ai/`)
+### 3A — Multi-Provider AI System (`packages/ai/`)
 
-- [ ] **3.1** `pipeline.ts`: `callLLM()` → JSON response → Zod validate → auto-repair if invalid → `Result<FlowGraph, AIError>`
-- [ ] **3.2** `prompts/generate.ts`: system prompt with FlowGraph schema + examples + constraints (must have start/end, confidence scores)
-- [ ] **3.3** `prompts/analyze.ts`: outputs structured report (dead ends, loops, missing branches)
-- [ ] **3.4** `prompts/improve.ts`: outputs modified FlowGraph + change list
-- [ ] **3.5** `prompts/explain.ts`: outputs markdown walkthrough
-- [ ] **3.6** `confidence.ts`: score per node based on edge count, label clarity, position. AI nodes get LLM score, user nodes default 1.0. Threshold <0.7 = yellow
+- [ ] **3.1** `providers/base.ts`: `AIProviderConfig` interface — `{ name, type (openrouter|openai|anthropic|xai), apiKey, baseUrl, models[] }`
+- [ ] **3.2** `providers/openrouter.ts`: OpenRouter adapter — supports `models[]` array for built-in fallback within OpenRouter
+- [ ] **3.3** `providers/openai.ts`: Direct OpenAI adapter (GPT-4o, o1, etc.)
+- [ ] **3.4** `providers/anthropic.ts`: Direct Anthropic adapter (Claude 3.5/4)
+- [ ] **3.5** `providers/xai.ts`: Direct xAI adapter (Grok)
+- [ ] **3.6** `router.ts`: Priority-based provider routing engine:
+  ```
+  Config: [
+    { provider: "openrouter", models: ["anthropic/claude-4", "openai/gpt-4o"], priority: 1 },
+    { provider: "openai", models: ["gpt-4o"], priority: 2 },
+    { provider: "anthropic", models: ["claude-sonnet-4"], priority: 3 },
+  ]
+  Flow: Try priority 1 → on failure, try priority 2 → on failure, try priority 3 → throw
+  ```
+- [ ] **3.7** `pipeline.ts`: `callLLM()` → router selects provider → JSON response → Zod validate → auto-repair → `Result<FlowGraph, AIError>` (includes `usedProvider` + `usedModel` in response metadata)
+- [ ] **3.8** `prompts/generate.ts`: system prompt with FlowGraph schema + examples + constraints
+- [ ] **3.9** `prompts/analyze.ts`: outputs structured report (dead ends, loops, missing branches)
+- [ ] **3.10** `prompts/improve.ts`: outputs modified FlowGraph + change list
+- [ ] **3.11** `prompts/explain.ts`: outputs markdown walkthrough
+- [ ] **3.12** `confidence.ts`: score per node. AI nodes get LLM score, user nodes = 1.0. <0.7 = yellow glow
 
-### 3B — Rate Limiting & Sanitization
+### 3B — BullMQ Jobs & Rate Limiting
 
-- [ ] **3.7** `shared/lib/rate-limit.ts`: Upstash Redis, 10/min/user, 429 with Retry-After
-- [ ] **3.8** Input sanitization: strip HTML, 2000 char limit, XSS prevention on labels
+- [ ] **3.13** `shared/lib/rate-limit.ts`: Redis INCR+EXPIRE, 10/min/user, 429 with Retry-After header
+- [ ] **3.14** BullMQ `ai-generation` queue: long-running AI calls run as background jobs, results pushed via Server-Sent Events (SSE) to client for real-time progress
+- [ ] **3.15** BullMQ `embedding-generation` queue: batch-generate embeddings for new templates asynchronously
+- [ ] **3.16** Input sanitization: strip HTML, 2000 char limit, XSS prevention on labels
 
 ### 3C — AI Feature (`features/ai/`)
 
-- [ ] **3.9** `ai-service.ts`: client-side fetch calls to `/api/ai/*`
-- [ ] **3.10** `GenerateModal.tsx`: prompt input → generate → load into editor → auto-layout
-- [ ] **3.11** `AnalysisPanel.tsx`: dead ends (red), loops (orange), suggestions list in right sidebar
-- [ ] **3.12** `ImproveDiff.tsx`: shows proposed changes — approve/reject
-- [ ] **3.13** `ExplainPanel.tsx`: markdown explanation in slide-out panel
-- [ ] **3.14** API routes: `POST /api/ai/{generate,analyze,improve,explain}` — auth + rate limit + call `@createflowchart/ai` pipeline
+- [ ] **3.17** `ai-service.ts`: client-side fetch calls to `/api/ai/*`, SSE listener for job progress
+- [ ] **3.18** `GenerateModal.tsx`: prompt input → generate → progress indicator → load into editor
+- [ ] **3.19** `AnalysisPanel.tsx`: dead ends (red), loops (orange), suggestions list in right sidebar
+- [ ] **3.20** `ImproveDiff.tsx`: shows proposed changes — approve/reject
+- [ ] **3.21** `ExplainPanel.tsx`: markdown explanation in slide-out panel
+- [ ] **3.22** `ProviderSettings.tsx`: user can configure provider priority, API keys (stored encrypted)
+- [ ] **3.23** API routes: `POST /api/ai/{generate,analyze,improve,explain}` — auth + rate limit + enqueue BullMQ job
 
 ### Wiring: AI ↔ Editor
 ```
@@ -454,8 +483,8 @@ features/ai GenerateModal → /api/ai/generate → @createflowchart/ai pipeline 
 - [ ] **4.1** `server.ts`: HTTP + WSS on PORT 4000, `GET /health`, connection upgrade with JWT validation
 - [ ] **4.2** `handlers/sync.ts`: room = flow ID, load FlowGraph from Postgres on first connect, Yjs doc mirrors FlowGraph
 - [ ] **4.3** `handlers/awareness.ts`: presence data (user, cursor {x,y}, selectedNodeId, status active|idle)
-- [ ] **4.4** `persistence-worker.ts`: snapshot every 5s (changed rooms only) → validate → UPDATE Postgres. Final snapshot on room close
-- [ ] **4.5** Per-socket rate limit: 100 msg/sec, disconnect + 60s ban on violation
+- [ ] **4.4** `persistence-worker.ts`: BullMQ repeatable job — snapshot changed rooms every 5s → validate → UPDATE Postgres. Final snapshot on room close. Uses `yjs-snapshot` queue
+- [ ] **4.5** Per-socket rate limit via Redis: 100 msg/sec, disconnect + 60s ban (Redis sorted set with TTL)
 
 ### 4B — Collaboration Feature (`features/collaboration/`)
 
@@ -521,19 +550,21 @@ Browser B: React Flow ↔ Zustand ↔ Yjs Doc (local) ↔ WSS ──┘        �
 ### 6B — Export Feature (`features/export/`)
 
 - [ ] **6.4** `export-service.ts` + `useExport.ts`: PNG (html-to-image 2x), SVG (transparent), PDF (diagram + AI explanation + metadata), Mermaid (core transform), JSON (raw FlowGraph)
-- [ ] **6.5** API: `POST /api/export` with format param
-- [ ] **6.6** Toolbar dropdown with format options
+- [ ] **6.5** BullMQ `export-render` queue: heavy PDF/PNG exports run as background jobs, download link pushed via SSE
+- [ ] **6.6** API: `POST /api/export` with format param → enqueue job → return job ID
+- [ ] **6.7** Toolbar dropdown with format options + progress indicator
 
 ### 6C — Docker & Deployment
 
-- [ ] **6.7** `apps/web/Dockerfile`: multi-stage (deps → build → standalone runner), target <200MB
-- [ ] **6.8** `apps/realtime/Dockerfile`: multi-stage, target <100MB
-- [ ] **6.9** Production `docker-compose.yml`: web (3000), realtime (4000), postgres (5432), redis (6379)
-- [ ] **6.10** Coolify config: domains, SSL, health checks, env vars
-- [ ] **6.11** CI: `.github/workflows/ci.yml` — lint → test → build on PR to dev
-- [ ] **6.12** CD: `.github/workflows/deploy.yml` — build images → push → Coolify webhook on merge to dev
-- [ ] **6.13** Sentry in web + realtime, source maps, error alerts
-- [ ] **6.14** Postgres monitoring (`pg_stat_statements`), realtime server connection/room/latency logging
+- [ ] **6.8** `apps/web/Dockerfile`: multi-stage (deps → build → standalone runner), target <200MB
+- [ ] **6.9** `apps/realtime/Dockerfile`: multi-stage, target <100MB
+- [ ] **6.10** Production `docker-compose.yml`: web (3000), realtime (4000), postgres (5432), redis (6379)
+- [ ] **6.11** Coolify config: domains, SSL, health checks, env vars — Postgres + Redis self-hosted via Coolify
+- [ ] **6.12** BullMQ Bull Board dashboard at `/admin/queues` for monitoring job status
+- [ ] **6.13** CI: `.github/workflows/ci.yml` — lint → test → build on PR to dev
+- [ ] **6.14** CD: `.github/workflows/deploy.yml` — build images → push → Coolify webhook on merge to dev
+- [ ] **6.15** Sentry in web + realtime, source maps, error alerts
+- [ ] **6.16** Postgres monitoring (`pg_stat_statements`), Redis monitoring (`INFO`, memory alerts), realtime server metrics
 
 ---
 
@@ -557,8 +588,9 @@ Browser B: React Flow ↔ Zustand ↔ Yjs Doc (local) ↔ WSS ──┘        �
 4. **No breaking schema changes without versioning** — `meta.version` field
 5. **AI MUST include confidence scores** — every AI node/edge gets a score
 6. **Sanitize ALL user text** — prompts, labels, descriptions
-7. **Rate limit: 10 AI gen/min/user** — Upstash middleware
-8. **Sandbox flows are private** — localStorage until explicit "Save to Cloud"
+7. **Rate limit: 10 AI gen/min/user** — Redis INCR+EXPIRE
+8. **BullMQ for heavy operations** — AI generation, export rendering, embedding generation
+9. **Sandbox flows are private** — localStorage until explicit "Save to Cloud"
 9. **All changes via `dev` branch** — no direct pushes to `main`
 10. **Zustand is client-only** — never in Server Components
 11. **`app/` pages are thin** — max 15 lines, import from `features/`
@@ -566,14 +598,21 @@ Browser B: React Flow ↔ Zustand ↔ Yjs Doc (local) ↔ WSS ──┘        �
 
 ---
 
-## Open Questions
+## Resolved Decisions
+
+| Decision | Choice |
+|---|---|
+| **AI Provider** | Multi-provider with priority-based fallback: OpenRouter, OpenAI, Anthropic, xAI. User-configurable. |
+| **Auth** | Better Auth with Drizzle adapter. GitHub + Google OAuth + email/password. |
+| **Postgres/Redis** | Self-hosted via Coolify. Docker Compose for local dev. |
+| **Job Queue** | BullMQ backed by Redis for AI generation, export rendering, embedding batch jobs. |
+| **Rate Limiting** | Custom Redis-based (`INCR` + `EXPIRE`), no Upstash dependency. |
+
+## Remaining Open Questions
 
 > [!IMPORTANT]
-> Need your input before execution:
+> Need your input:
 
-1. **AI Provider**: OpenAI GPT-4o, Google Gemini 2.5 Pro, or both with fallback?
-2. **Auth Providers**: GitHub + Google OAuth planned. Need email/password or magic link too?
-3. **Postgres**: Local Docker, Supabase, or Coolify-managed for development?
-4. **Domain**: Is `createflowchart.com` ready on Coolify, or defer deployment?
-5. **Template Content**: AI-generate seed templates, or hand-curate?
-6. **Phase Order**: Current is 0→6 sequential. Skip or reorder any phase?
+1. **Domain**: Is `createflowchart.com` ready on Coolify, or defer deployment?
+2. **Template Content**: AI-generate seed templates, or hand-curate?
+3. **Phase Order**: Current is 0→6 sequential. Skip or reorder any phase?
