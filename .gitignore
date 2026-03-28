@@ -1,5 +1,31 @@
+# Dependencies
 node_modules/
+.pnpm-store/
+
+# Build outputs
 .next/
+dist/
+.turbo/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# OS
 .DS_Store
-/docs/
-/docs/prd.md
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Debug
+npm-debug.log*
+pnpm-debug.log*
+
+# Docker
+pg_data/
+redis_data/
