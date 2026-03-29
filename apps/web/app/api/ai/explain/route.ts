@@ -19,23 +19,24 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { prompt, context, nodeCount } = body;
+    const { flowGraph } = body;
 
-    if (!prompt || typeof prompt !== "string") {
+    if (!flowGraph) {
       return NextResponse.json(
-        { error: "Prompt is required" },
+        { error: "FlowGraph is required" },
         { status: 400 },
       );
     }
 
     const jobData: AIGenerationJobData = {
       userId: session.user.id,
-      prompt,
-      action: "generate",
+      prompt: "",
+      action: "explain",
+      existingFlowGraph: JSON.stringify(flowGraph),
     };
 
-    const job = await aiGenerationQueue.add("generate", jobData, {
-      jobId: `gen_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    const job = await aiGenerationQueue.add("explain", jobData, {
+      jobId: `explain_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     });
 
     return NextResponse.json({
@@ -43,9 +44,9 @@ export async function POST(req: NextRequest) {
       status: "pending",
     });
   } catch (error: any) {
-    console.error("[AI Generation Error]:", error);
+    console.error("[AI Explain Error]:", error);
     return NextResponse.json(
-      { error: "Failed to queue generation job", message: error.message },
+      { error: "Failed to queue explain job", message: error.message },
       { status: 500 },
     );
   }

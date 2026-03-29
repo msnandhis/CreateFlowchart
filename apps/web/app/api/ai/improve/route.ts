@@ -19,23 +19,31 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { prompt, context, nodeCount } = body;
+    const { flowGraph, instruction } = body;
 
-    if (!prompt || typeof prompt !== "string") {
+    if (!flowGraph) {
       return NextResponse.json(
-        { error: "Prompt is required" },
+        { error: "FlowGraph is required" },
+        { status: 400 },
+      );
+    }
+
+    if (!instruction || typeof instruction !== "string") {
+      return NextResponse.json(
+        { error: "Improvement instruction is required" },
         { status: 400 },
       );
     }
 
     const jobData: AIGenerationJobData = {
       userId: session.user.id,
-      prompt,
-      action: "generate",
+      prompt: instruction,
+      action: "improve",
+      existingFlowGraph: JSON.stringify(flowGraph),
     };
 
-    const job = await aiGenerationQueue.add("generate", jobData, {
-      jobId: `gen_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    const job = await aiGenerationQueue.add("improve", jobData, {
+      jobId: `improve_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     });
 
     return NextResponse.json({
@@ -43,9 +51,9 @@ export async function POST(req: NextRequest) {
       status: "pending",
     });
   } catch (error: any) {
-    console.error("[AI Generation Error]:", error);
+    console.error("[AI Improve Error]:", error);
     return NextResponse.json(
-      { error: "Failed to queue generation job", message: error.message },
+      { error: "Failed to queue improve job", message: error.message },
       { status: 500 },
     );
   }
