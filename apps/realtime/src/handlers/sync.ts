@@ -1,7 +1,6 @@
 import type { WebSocket } from "ws";
 import type { IncomingMessage } from "node:http";
 import * as Y from "yjs";
-import { authWebSocket } from "../auth";
 import { getPersistence, type RoomPersistence } from "../persistence";
 
 interface SyncConnection {
@@ -57,19 +56,13 @@ export function handleSyncConnection(
   req: IncomingMessage,
   roomName: string,
 ): { success: boolean; error?: string; userId?: string } {
-  const authResult = authWebSocket(req);
-  if (!authResult.authorized) {
-    ws.close(4001, authResult.error || "Unauthorized");
-    return { success: false, error: authResult.error };
-  }
-
   const doc = new Y.Doc();
   const persistence = getPersistence();
 
   const conn: SyncConnection = {
     ws,
     doc,
-    userId: authResult.userId!,
+    userId: `guest-${Date.now()}`,
     roomName,
     isAlive: true,
   };
@@ -100,7 +93,7 @@ export function handleSyncConnection(
     removeConnection(roomName, ws);
     doc.destroy();
     console.log(
-      `[Sync] Connection closed for room: ${roomName}, user: ${authResult.userId}`,
+      `[Sync] Connection closed for room: ${roomName}, user: guest`,
     );
   });
 
@@ -113,9 +106,9 @@ export function handleSyncConnection(
   loadPersistedDoc(doc, roomName, persistence);
 
   console.log(
-    `[Sync] New connection for room: ${roomName}, user: ${authResult.userId}`,
+    `[Sync] New connection for room: ${roomName}, user: guest`,
   );
-  return { success: true, userId: authResult.userId };
+  return { success: true, userId: "guest" };
 }
 
 async function loadPersistedDoc(

@@ -3,9 +3,65 @@ export const dynamic = "force-dynamic";
 
 import { auth } from "@/shared/lib/auth";
 import { db } from "@/shared/lib/db";
-import { flows } from "@createflowchart/db";
+import { flows, users } from "@createflowchart/db";
 import { eq, and } from "drizzle-orm";
 import { headers } from "next/headers";
+
+/**
+ * Get Flow by ID
+ * GET /api/flows/[id]
+ */
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    const flow = await db.query.flows.findFirst({
+      where: eq(flows.id, id),
+    });
+
+    if (!flow) {
+      return NextResponse.json({ error: "Flow not found" }, { status: 404 });
+    }
+
+    if (!flow.isPublic && (!session || session.user.id !== flow.userId)) {
+      return NextResponse.json({ error: "Flow is private" }, { status: 403 });
+    }
+
+    const author = await db.query.users.findFirst({
+      where: eq(users.id, flow.userId),
+    });
+
+    return NextResponse.json({
+      id: flow.id,
+      title: flow.title,
+      data: flow.data,
+      isPublic: flow.isPublic,
+      isFeatured: flow.isFeatured,
+      likeCount: flow.likeCount,
+      createdAt: flow.createdAt,
+      updatedAt: flow.updatedAt,
+      author: author
+        ? {
+            id: author.id,
+            name: author.name,
+            image: author.image,
+          }
+        : null,
+    });
+  } catch (error: any) {
+    console.error("[Flow Get Error]:", error);
+    return NextResponse.json(
+      { error: "Failed to get flow", message: error.message },
+      { status: 500 }
+    );
+  }
+}
 
 /**
  * Update Flow Data (Auto-save)
