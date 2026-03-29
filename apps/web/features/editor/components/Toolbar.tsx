@@ -5,8 +5,12 @@ import { Button } from "@/shared/ui/Button";
 import styles from "../styles/toolbar.module.css";
 import { useLayout } from "../hooks/use-layout";
 
+interface ToolbarProps {
+  onExport?: () => void;
+  onShare?: () => void;
+}
 
-export function Toolbar() {
+export function Toolbar({ onExport, onShare }: ToolbarProps) {
   const title = useEditorStore((s) => s.title);
   const setTitle = useEditorStore((s) => s.setTitle);
   const undo = useEditorStore((s) => s.undo);
@@ -60,10 +64,10 @@ export function Toolbar() {
       </span>
 
       <div className={styles.group}>
-        <Button variant="ghost" size="sm" title="Export">
+        <Button variant="ghost" size="sm" title="Export" onClick={onExport}>
           <ExportIcon />
         </Button>
-        <Button variant="secondary" size="sm" title="Share">
+        <Button variant="secondary" size="sm" title="Share" onClick={onShare}>
           Share
         </Button>
       </div>

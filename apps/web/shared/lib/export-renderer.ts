@@ -89,23 +89,11 @@ export function exportAsSVG(flowGraph: FlowGraph): ExportResult {
 }
 
 export function exportAsPNGData(flowGraph: FlowGraph): ExportResult {
-  const svgResult = exportAsSVG(flowGraph);
-  return {
-    success: true,
-    format: "png",
-    content: svgResult.content,
-    fileSize: svgResult.fileSize,
-  };
+  return exportAsSVG(flowGraph);
 }
 
 export function exportAsPDFData(flowGraph: FlowGraph): ExportResult {
-  const svgResult = exportAsSVG(flowGraph);
-  return {
-    success: true,
-    format: "pdf",
-    content: svgResult.content,
-    fileSize: svgResult.fileSize,
-  };
+  return exportAsSVG(flowGraph);
 }
 
 function escapeXml(text: string): string {
@@ -115,4 +103,8 @@ function escapeXml(text: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+export function getSVGString(flowGraph: FlowGraph): string {
+  return exportAsSVG(flowGraph).content || "";
 }
