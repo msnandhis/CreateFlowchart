@@ -37,6 +37,9 @@ export interface TemplateWithAuthor {
   likeCount: number;
   isFeatured: boolean;
   isPublic: boolean;
+  family: DiagramDocument["family"];
+  edgeCount: number;
+  containerCount: number;
   nodeCount: number;
   createdAt: Date;
   updatedAt: Date;
@@ -399,6 +402,9 @@ class TemplateService {
       likeCount: record.likeCount,
       isFeatured: record.isFeatured,
       isPublic: record.isPublic,
+      family: normalized.document.family,
+      edgeCount: normalized.document.edges.length,
+      containerCount: normalized.document.containers.length,
       nodeCount: normalized.document.nodes.length,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,

@@ -13,6 +13,9 @@ interface FlowCardProps {
   likeCount: number;
   updatedAt: string;
   nodeCount?: number;
+  edgeCount?: number;
+  containerCount?: number;
+  family?: DiagramDocument["family"];
   document?: DiagramDocument;
   onDelete?: (id: string) => void;
   onLike?: (id: string) => void;
@@ -28,6 +31,9 @@ export function FlowCard({
   likeCount,
   updatedAt,
   nodeCount = 0,
+  edgeCount = 0,
+  containerCount = 0,
+  family,
   document,
   onDelete,
   onLike,
@@ -69,13 +75,31 @@ export function FlowCard({
         </div>
         <div className={styles.cardContent}>
           <h3 className={styles.cardTitle}>{title}</h3>
+          <div className={styles.cardMetaBadges}>
+            {family ? <Badge variant="default">{family}</Badge> : null}
+            {containerCount > 0 ? (
+              <Badge variant="default">{containerCount} groups</Badge>
+            ) : null}
+          </div>
           <div className={styles.cardMeta}>
             <span>{formattedDate}</span>
-            <span>{nodeCount} nodes</span>
+            <span>
+              {nodeCount} nodes / {edgeCount} edges
+            </span>
             {isPublic && <Badge variant="success">Public</Badge>}
           </div>
         </div>
       </Link>
+      <div className={styles.cardFooter}>
+        <Link href={`/editor/${id}`} className={styles.cardActionLink}>
+          Open
+        </Link>
+        {isPublic ? (
+          <Link href={`/view/${id}`} className={styles.cardActionLinkMuted}>
+            Preview
+          </Link>
+        ) : null}
+      </div>
       <div className={styles.cardActions}>
         {showLikeButton && (
           <button

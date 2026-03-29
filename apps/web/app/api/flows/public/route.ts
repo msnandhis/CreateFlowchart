@@ -13,8 +13,11 @@ interface FlowWithAuthor {
   data: unknown;
   document: unknown;
   formatVersion: string;
+  family: string;
   isPublic: boolean;
   likeCount: number;
+  edgeCount: number;
+  containerCount: number;
   nodeCount: number;
   createdAt: Date;
   updatedAt: Date;
@@ -81,8 +84,11 @@ export async function GET(req: Request) {
       data: normalized.legacy,
       document: normalized.document,
       formatVersion: normalized.formatVersion,
+      family: normalized.document.family,
       isPublic: f.isPublic,
       likeCount: f.likeCount,
+      edgeCount: normalized.document.edges.length,
+      containerCount: normalized.document.containers.length,
       nodeCount: normalized.document.nodes.length,
       createdAt: f.createdAt,
       updatedAt: f.updatedAt,

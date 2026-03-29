@@ -14,10 +14,13 @@ interface Flow {
   title: string;
   data: { nodes: unknown[]; edges: unknown[] };
   document?: import("@createflowchart/schema").DiagramDocument;
+  family?: import("@createflowchart/schema").DiagramDocument["family"];
   isPublic: boolean;
   likeCount: number;
   updatedAt: string;
   nodeCount?: number;
+  edgeCount?: number;
+  containerCount?: number;
 }
 
 export function FlowList() {
@@ -122,6 +125,9 @@ export function FlowList() {
             likeCount={flow.likeCount}
             updatedAt={flow.updatedAt}
             nodeCount={flow.nodeCount ?? flow.document?.nodes.length ?? flow.data?.nodes?.length ?? 0}
+            edgeCount={flow.edgeCount ?? flow.document?.edges.length ?? 0}
+            containerCount={flow.containerCount ?? flow.document?.containers.length ?? 0}
+            family={flow.family ?? flow.document?.family}
             document={flow.document}
             onDelete={(id) => deleteMutation.mutate(id)}
           />

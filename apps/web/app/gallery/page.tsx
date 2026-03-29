@@ -12,8 +12,11 @@ interface FlowWithAuthor {
   data: unknown;
   document: unknown;
   formatVersion: string;
+  family: string;
   isPublic: boolean;
   likeCount: number;
+  edgeCount: number;
+  containerCount: number;
   nodeCount: number;
   createdAt: string;
   updatedAt: string;
@@ -161,6 +164,9 @@ export default function GalleryPage() {
                 likeCount={flow.likeCount}
                 updatedAt={flow.updatedAt}
                 nodeCount={flow.nodeCount ?? ((flow.data as any)?.nodes?.length || 0)}
+                edgeCount={flow.edgeCount}
+                containerCount={flow.containerCount}
+                family={flow.family as any}
                 document={flow.document as any}
                 userLiked={flow.userLiked}
                 showLikeButton

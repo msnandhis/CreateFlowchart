@@ -71,7 +71,10 @@ export default async function TemplateDetailPage({
                 color: "var(--color-text-muted)",
               }}
             >
+              <span>{template.family}</span>
               <span>{template.nodeCount} nodes</span>
+              <span>{template.edgeCount} edges</span>
+              <span>{template.containerCount} groups</span>
               <span>{template.usageCount} uses</span>
               <span>{template.likeCount} likes</span>
               <span>{template.category}</span>

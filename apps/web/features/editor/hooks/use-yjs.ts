@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { useEditorStore } from "../stores/editorStore";
+import type { DiagramDocument } from "@createflowchart/schema";
 
 const REALTIME_URL =
   process.env.NEXT_PUBLIC_REALTIME_URL || "ws://localhost:4000";
@@ -35,10 +36,12 @@ interface UserPresence {
  * Handles nodes, edges, and presence (cursors).
  */
 export function useYjs(flowId: string | null) {
-  const { rfNodes, rfEdges, loadFlow } = useEditorStore();
+  const document = useEditorStore((s) => s.document);
+  const setDocument = useEditorStore((s) => s.setDocument);
   const ydocRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
   const isLocalUpdateRef = useRef(false);
+  const lastSerializedDocumentRef = useRef<string | null>(null);
   const userIdRef = useRef<string>(
     `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   );
@@ -74,8 +77,7 @@ export function useYjs(flowId: string | null) {
     ydocRef.current = doc;
     providerRef.current = provider;
 
-    const yNodes = doc.getMap("nodes");
-    const yEdges = doc.getMap("edges");
+    const yDiagram = doc.getMap<string>("diagram");
 
     provider.awareness.setLocalStateField("user", {
       id: userIdRef.current,
@@ -88,33 +90,28 @@ export function useYjs(flowId: string | null) {
     const handleYDocumentUpdate = () => {
       isLocalUpdateRef.current = true;
       try {
-        const nodes = Array.from(yNodes.values()) as any[];
-        const edges = Array.from(yEdges.values()) as any[];
+        const serialized = yDiagram.get("document");
+        if (!serialized || serialized === lastSerializedDocumentRef.current) {
+          return;
+        }
 
-        if (nodes.length === 0 && edges.length === 0) return;
-
-        useEditorStore.setState({
-          rfNodes: nodes,
-          rfEdges: edges,
-        });
+        const nextDocument = JSON.parse(serialized) as DiagramDocument;
+        lastSerializedDocumentRef.current = serialized;
+        setDocument(nextDocument);
       } finally {
         isLocalUpdateRef.current = false;
       }
     };
 
-    yNodes.observeDeep(handleYDocumentUpdate);
-    yEdges.observeDeep(handleYDocumentUpdate);
+    yDiagram.observe(handleYDocumentUpdate);
 
     const handleProviderSync = (isSynced: boolean) => {
       if (isSynced) {
-        const nodes = Array.from(yNodes.values()) as any[];
-        const edges = Array.from(yEdges.values()) as any[];
-
-        if (nodes.length > 0 || edges.length > 0) {
-          useEditorStore.setState({
-            rfNodes: nodes,
-            rfEdges: edges,
-          });
+        const serialized = yDiagram.get("document");
+        if (serialized) {
+          const syncedDocument = JSON.parse(serialized) as DiagramDocument;
+          lastSerializedDocumentRef.current = serialized;
+          setDocument(syncedDocument);
         }
       }
     };
@@ -123,39 +120,27 @@ export function useYjs(flowId: string | null) {
 
     return () => {
       provider.off("sync", handleProviderSync);
+      yDiagram.unobserve(handleYDocumentUpdate);
       provider.disconnect();
       doc.destroy();
     };
-  }, [flowId]);
+  }, [flowId, setDocument]);
 
   useEffect(() => {
     const doc = ydocRef.current;
     if (!doc || isLocalUpdateRef.current) return;
 
-    const yNodes = doc.getMap("nodes");
-    const yEdges = doc.getMap("edges");
+    const yDiagram = doc.getMap<string>("diagram");
+    const serialized = JSON.stringify(document);
+    if (yDiagram.get("document") === serialized) {
+      return;
+    }
 
     doc.transact(() => {
-      const currentNodes = new Map(rfNodes.map((n) => [n.id, n]));
-      const currentEdges = new Map(rfEdges.map((e) => [e.id, e]));
-
-      yNodes.forEach((_, key) => {
-        if (!currentNodes.has(key)) yNodes.delete(key);
-      });
-
-      yEdges.forEach((_, key) => {
-        if (!currentEdges.has(key)) yEdges.delete(key);
-      });
-
-      rfNodes.forEach((node) => {
-        yNodes.set(node.id, node);
-      });
-
-      rfEdges.forEach((edge) => {
-        yEdges.set(edge.id, edge);
-      });
+      yDiagram.set("document", serialized);
     }, "local");
-  }, [rfNodes, rfEdges]);
+    lastSerializedDocumentRef.current = serialized;
+  }, [document]);
 
   return { provider: providerRef.current, updateLocalCursor };
 }

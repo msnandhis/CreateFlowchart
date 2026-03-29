@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback, useState } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { useEditorStore } from "../stores/editorStore";
+import type { DiagramDocument } from "@createflowchart/schema";
 
 const REALTIME_URL =
   process.env.NEXT_PUBLIC_REALTIME_URL || "ws://localhost:4000";
@@ -33,10 +34,12 @@ export function useYjsSync({
     connectionStatus: "disconnected",
   });
 
-  const { rfNodes, rfEdges, setFlowGraph } = useEditorStore();
+  const document = useEditorStore((s) => s.document);
+  const setDocument = useEditorStore((s) => s.setDocument);
   const ydocRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
   const isLocalChangeRef = useRef(false);
+  const lastSerializedDocumentRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!flowId) return;
@@ -54,8 +57,7 @@ export function useYjsSync({
     ydocRef.current = doc;
     providerRef.current = provider;
 
-    const yNodes = doc.getMap("nodes");
-    const yEdges = doc.getMap("edges");
+    const yDiagram = doc.getMap<string>("diagram");
 
     provider.on("status", ({ status }: { status: string }) => {
       setSyncState((prev) => ({
@@ -72,29 +74,18 @@ export function useYjsSync({
     const handleYDocumentUpdate = () => {
       if (isLocalChangeRef.current) return;
 
-      const nodes = Array.from(yNodes.values()) as any[];
-      const edges = Array.from(yEdges.values()) as any[];
+      const serialized = yDiagram.get("document");
+      if (!serialized || serialized === lastSerializedDocumentRef.current) return;
 
-      if (nodes.length === 0 && edges.length === 0) return;
-
-      const currentNodes = useEditorStore.getState().rfNodes;
-      const currentEdges = useEditorStore.getState().rfEdges;
-
-      if (
-        JSON.stringify(nodes) !== JSON.stringify(currentNodes) ||
-        JSON.stringify(edges) !== JSON.stringify(currentEdges)
-      ) {
-        useEditorStore.setState({
-          rfNodes: nodes,
-          rfEdges: edges,
-        });
-      }
+      const nextDocument = JSON.parse(serialized) as DiagramDocument;
+      lastSerializedDocumentRef.current = serialized;
+      setDocument(nextDocument);
     };
 
-    yNodes.observeDeep(handleYDocumentUpdate);
-    yEdges.observeDeep(handleYDocumentUpdate);
+    yDiagram.observe(handleYDocumentUpdate);
 
     return () => {
+      yDiagram.unobserve(handleYDocumentUpdate);
       provider.disconnect();
       doc.destroy();
       isLocalChangeRef.current = false;
@@ -104,45 +95,25 @@ export function useYjsSync({
         connectionStatus: "disconnected",
       });
     };
-  }, [flowId]);
+  }, [flowId, setDocument]);
 
   useEffect(() => {
     const doc = ydocRef.current;
     if (!doc || !syncState.isConnected) return;
 
-    const yNodes = doc.getMap("nodes");
-    const yEdges = doc.getMap("edges");
+    const yDiagram = doc.getMap<string>("diagram");
+    const serialized = JSON.stringify(document);
+    if (yDiagram.get("document") === serialized) return;
 
     isLocalChangeRef.current = true;
 
     doc.transact(() => {
-      rfNodes.forEach((node) => {
-        const existing = yNodes.get(node.id);
-        if (JSON.stringify(existing) !== JSON.stringify(node)) {
-          yNodes.set(node.id, node);
-        }
-      });
-
-      const nodeIds = new Set(rfNodes.map((n) => n.id));
-      yNodes.forEach((_, key) => {
-        if (!nodeIds.has(key)) yNodes.delete(key);
-      });
-
-      rfEdges.forEach((edge) => {
-        const existing = yEdges.get(edge.id);
-        if (JSON.stringify(existing) !== JSON.stringify(edge)) {
-          yEdges.set(edge.id, edge);
-        }
-      });
-
-      const edgeIds = new Set(rfEdges.map((e) => e.id));
-      yEdges.forEach((_, key) => {
-        if (!edgeIds.has(key)) yEdges.delete(key);
-      });
+      yDiagram.set("document", serialized);
     }, "local");
 
+    lastSerializedDocumentRef.current = serialized;
     isLocalChangeRef.current = false;
-  }, [rfNodes, rfEdges, syncState.isConnected]);
+  }, [document, syncState.isConnected]);
 
   const disconnect = useCallback(() => {
     providerRef.current?.disconnect();

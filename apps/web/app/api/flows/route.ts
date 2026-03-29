@@ -33,6 +33,10 @@ export async function GET(req: Request) {
         data: normalized.legacy,
         document: normalized.document,
         formatVersion: normalized.formatVersion,
+        family: normalized.document.family,
+        nodeCount: normalized.document.nodes.length,
+        edgeCount: normalized.document.edges.length,
+        containerCount: normalized.document.containers.length,
       };
     }),
   );
@@ -74,5 +78,9 @@ export async function POST(req: Request) {
     data: normalized.legacy,
     document: normalized.document,
     formatVersion: normalized.formatVersion,
+    family: normalized.document.family,
+    nodeCount: normalized.document.nodes.length,
+    edgeCount: normalized.document.edges.length,
+    containerCount: normalized.document.containers.length,
   });
 }

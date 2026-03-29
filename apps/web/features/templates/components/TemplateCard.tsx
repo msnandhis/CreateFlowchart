@@ -37,9 +37,16 @@ export function TemplateCard({
           {template.description && (
             <p className={styles.cardDescription}>{template.description}</p>
           )}
+          <div className={styles.cardMetaBadges}>
+            <Badge variant="default">{template.family}</Badge>
+            {template.containerCount > 0 ? (
+              <Badge variant="default">{template.containerCount} groups</Badge>
+            ) : null}
+          </div>
           <div className={styles.cardMeta}>
             <div className={styles.cardStats}>
               <span>{nodeCount} nodes</span>
+              <span>{template.edgeCount} edges</span>
               <span>{template.usageCount} uses</span>
               <span>{template.likeCount} likes</span>
             </div>
@@ -49,6 +56,17 @@ export function TemplateCard({
           </div>
         </div>
       </Link>
+      <div className={styles.cardFooter}>
+        <Link href={`/templates/${template.id}`} className={styles.cardActionLink}>
+          Preview
+        </Link>
+        <Link
+          href={`/editor?template=${template.id}`}
+          className={styles.cardActionLinkPrimary}
+        >
+          Use Template
+        </Link>
+      </div>
       {showActions && (
         <div className={styles.cardActions}>
           <button

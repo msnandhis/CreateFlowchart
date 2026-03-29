@@ -96,10 +96,14 @@ export function documentToMermaid(document: DiagramDocument): string {
 
     if (node.kind.includes("start") || node.kind.includes("end")) {
       lines.push(`    ${node.id}(["${label}"])`);
+    } else if (document.family === "bpmn" && node.kind.includes("parallel")) {
+      lines.push(`    ${node.id}{{"${label}"}}`);
     } else if (node.kind.includes("gateway") || node.kind.includes("decision")) {
       lines.push(`    ${node.id}{"${label}"}`);
     } else if (node.kind.includes("automation") || node.kind.includes("service")) {
       lines.push(`    ${node.id}[/\"${label}\"/]`);
+    } else if (document.family === "bpmn" && node.kind.includes("subprocess")) {
+      lines.push(`    ${node.id}[[\"${label}\"]]`);
     } else if (node.shape === "document" || node.shape === "multi-document") {
       lines.push(`    ${node.id}["${label}"]`);
     } else {
@@ -427,6 +431,8 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
   const laneOffsets = new Map<string, number>();
   const nodeToContainer = new Map<string, string>();
   const childContainerAssignments = new Map<string, Set<string>>();
+  let inferredFamily: DiagramDocument["family"] = "flowchart";
+  let inferredKit = "core-flowchart";
 
   const ensureContainer = (containerId: string, label: string) => {
     if (containers.has(containerId)) {
@@ -434,14 +440,29 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
     }
 
     const parentContainerId = containerStack.at(-1);
+    const normalizedLabel = label.toLowerCase();
+    const containerFamily =
+      normalizedLabel.includes("pool") ||
+      normalizedLabel.includes("lane") ||
+      parentContainerId
+        ? "bpmn"
+        : inferredFamily;
     const type =
-      parentContainerId || /lane/i.test(label) ? ("lane" as const) : ("group" as const);
+      normalizedLabel.includes("pool")
+        ? ("pool" as const)
+        : parentContainerId || /lane/i.test(label)
+          ? ("lane" as const)
+          : ("group" as const);
+    if (containerFamily === "bpmn") {
+      inferredFamily = "bpmn";
+      inferredKit = "bpmn-lite";
+    }
     const laneOffset = parentContainerId
       ? laneOffsets.get(parentContainerId) ?? 0
       : containers.size * 220;
     const container: DiagramContainer = {
       id: containerId,
-      family: "flowchart",
+      family: containerFamily,
       type,
       label,
       position: {
@@ -481,6 +502,10 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
     }
 
     const parsed = parseMermaidNodeToken(token ?? nodeId);
+    if (parsed.family === "bpmn") {
+      inferredFamily = "bpmn";
+      inferredKit = "bpmn-lite";
+    }
     const index = nodes.size;
     const activeContainerId = containerStack.at(-1);
     const container = activeContainerId ? containers.get(activeContainerId) : undefined;
@@ -489,7 +514,7 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
 
     const node: DiagramNode = {
       id: nodeId,
-      family: "flowchart",
+      family: parsed.family ?? inferredFamily,
       kind: parsed.kind,
       shape: parsed.shape,
       position: {
@@ -507,7 +532,7 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
       style: { tokens: {} },
       resizePolicy: "content",
       metadata: {
-        family: "flowchart",
+        family: parsed.family ?? inferredFamily,
         semanticKind: parsed.kind,
         shapeId: parsed.shape,
       },
@@ -590,11 +615,42 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
     }
   }
 
+  const normalizedNodes = Array.from(nodes.values()).map((node) => {
+    if (inferredFamily !== "bpmn") {
+      return node;
+    }
+
+    let kind = node.kind;
+    let shape = node.shape;
+    if (node.shape === "decision") {
+      kind = "exclusive-gateway";
+      shape = "bpmn-exclusive-gateway";
+    } else if (node.shape === "terminator-start") {
+      shape = "bpmn-start-event";
+    } else if (node.shape === "action-task") {
+      kind = "service-task";
+      shape = "bpmn-service-task";
+    }
+
+    return {
+      ...node,
+      family: "bpmn" as const,
+      kind,
+      shape,
+      metadata: {
+        ...node.metadata,
+        family: "bpmn",
+        semanticKind: kind,
+        shapeId: shape,
+      },
+    };
+  });
+
   return {
-    family: "flowchart",
-    kit: "core-flowchart",
+    family: inferredFamily,
+    kit: inferredKit,
     title: "Imported Mermaid Diagram",
-    nodes: Array.from(nodes.values()),
+    nodes: normalizedNodes,
     edges,
     containers: Array.from(containers.values()),
   };
@@ -690,6 +746,8 @@ export function parseMermaidState(source: string): DiagramDslAst {
 
   const nodes = new Map<string, DiagramNode>();
   const edges: DiagramEdge[] = [];
+  const containers = new Map<string, DiagramContainer>();
+  const containerStack: string[] = [];
 
   const ensureState = (id: string) => {
     const normalizedId = id === "[*]" ? `state_${nodes.size + 1}` : id;
@@ -719,10 +777,53 @@ export function parseMermaidState(source: string): DiagramDslAst {
     };
 
     nodes.set(normalizedId, node);
+    const parentContainerId = containerStack.at(-1);
+    if (parentContainerId) {
+      const container = containers.get(parentContainerId);
+      if (container && !container.childNodeIds.includes(normalizedId)) {
+        container.childNodeIds.push(normalizedId);
+      }
+    }
     return node;
   };
 
   for (const line of lines.slice(1)) {
+    const stateBlockMatch = line.match(/^state\s+([A-Za-z0-9_-]+)(?:\s+as\s+(.+))?\s*\{$/);
+    if (stateBlockMatch) {
+      const [, rawId, rawLabel] = stateBlockMatch;
+      const label = rawLabel?.replace(/^"|"$/g, "") ?? rawId;
+      const parentContainerId = containerStack.at(-1);
+      const index = containers.size;
+      containers.set(rawId, {
+        id: rawId,
+        family: "state",
+        type: "group",
+        label,
+        position: {
+          x: 72 + (index % 2) * 320,
+          y: 72 + Math.floor(index / 2) * 220,
+        },
+        size: { width: 280, height: 180 },
+        childNodeIds: [],
+        childContainerIds: [],
+        style: { tokens: {} },
+        metadata: parentContainerId ? { parentContainerId } : {},
+      });
+      if (parentContainerId) {
+        const parent = containers.get(parentContainerId);
+        if (parent && !parent.childContainerIds.includes(rawId)) {
+          parent.childContainerIds.push(rawId);
+        }
+      }
+      containerStack.push(rawId);
+      continue;
+    }
+
+    if (line === "}") {
+      containerStack.pop();
+      continue;
+    }
+
     const transitionMatch = line.match(/^(.+?)\s*-->\s*(.+?)(?:\s*:\s*(.+))?$/);
     if (!transitionMatch) {
       continue;
@@ -756,7 +857,7 @@ export function parseMermaidState(source: string): DiagramDslAst {
     title: "Imported Mermaid State Diagram",
     nodes: Array.from(nodes.values()),
     edges,
-    containers: [],
+    containers: Array.from(containers.values()),
   };
 }
 
@@ -791,9 +892,20 @@ function parseMermaidNodeToken(token: string): {
   kind: string;
   shape: string;
   size: { width: number; height: number };
+  family?: DiagramDocument["family"];
 } {
   const id = extractNodeId(token);
   const body = token.slice(id.length);
+
+  if (body.startsWith("{{") && body.endsWith("}}")) {
+    return {
+      label: body.slice(2, -2).replace(/^"|"$/g, ""),
+      kind: "parallel-gateway",
+      shape: "bpmn-parallel-gateway",
+      size: { width: 180, height: 120 },
+      family: "bpmn",
+    };
+  }
 
   if (body.startsWith("{") && body.endsWith("}")) {
     return {
@@ -816,9 +928,20 @@ function parseMermaidNodeToken(token: string): {
   if (body.startsWith("[/") && body.endsWith("/]")) {
     return {
       label: body.slice(2, -2).replace(/^"|"$/g, ""),
-      kind: "automation-task",
-      shape: "action-task",
+      kind: "service-task",
+      shape: "bpmn-service-task",
       size: { width: 180, height: 64 },
+      family: "bpmn",
+    };
+  }
+
+  if (body.startsWith("[[") && body.endsWith("]]")) {
+    return {
+      label: body.slice(2, -2).replace(/^"|"$/g, ""),
+      kind: "subprocess",
+      shape: "subprocess",
+      size: { width: 220, height: 80 },
+      family: "bpmn",
     };
   }
 
@@ -859,6 +982,45 @@ function documentToMermaidSequence(document: DiagramDocument): string {
 
 function documentToMermaidState(document: DiagramDocument): string {
   const lines: string[] = ["stateDiagram-v2"];
+  const renderedNodes = new Set<string>();
+
+  const renderStateNode = (nodeId: string, depth = 1) => {
+    const node = document.nodes.find((entry) => entry.id === nodeId);
+    if (!node || renderedNodes.has(node.id)) {
+      return;
+    }
+
+    const indent = "    ".repeat(depth);
+    if (node.kind !== "terminal-state") {
+      lines.push(`${indent}state ${node.id}`);
+    }
+    renderedNodes.add(node.id);
+  };
+
+  const renderContainer = (containerId: string, depth = 1) => {
+    const container = document.containers.find((entry) => entry.id === containerId);
+    if (!container) {
+      return;
+    }
+
+    const indent = "    ".repeat(depth);
+    lines.push(`${indent}state ${container.id} {`);
+    for (const childContainerId of container.childContainerIds) {
+      renderContainer(childContainerId, depth + 1);
+    }
+    for (const childNodeId of container.childNodeIds) {
+      renderStateNode(childNodeId, depth + 1);
+    }
+    lines.push(`${indent}}`);
+  };
+
+  for (const container of document.containers.filter((entry) => !entry.metadata.parentContainerId)) {
+    renderContainer(container.id);
+  }
+
+  for (const node of document.nodes) {
+    renderStateNode(node.id);
+  }
 
   for (const edge of document.edges) {
     const from = document.nodes.find((node) => node.id === edge.sourceNodeId);

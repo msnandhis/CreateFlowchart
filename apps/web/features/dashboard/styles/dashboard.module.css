@@ -85,6 +85,13 @@
   padding: var(--space-4);
 }
 
+.cardMetaBadges {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-2);
+}
+
 .cardTitle {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
@@ -109,6 +116,39 @@
   right: var(--space-3);
   display: flex;
   gap: var(--space-2);
+}
+
+.cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.cardActionLink,
+.cardActionLinkMuted {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.cardActionLink {
+  color: white;
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+}
+
+.cardActionLinkMuted {
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
 }
 
 .iconButton {
