@@ -1,0 +1,232 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Shared UI Component Styles
+   Design system primitives — dark-mode-first, clean & minimal
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── Button ────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-family: var(--font-family);
+  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+  white-space: nowrap;
+  user-select: none;
+  outline: none;
+}
+
+.btn:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 4px var(--color-primary);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Sizes */
+.btnSm { padding: 6px 12px; font-size: var(--font-size-xs); }
+.btnMd { padding: 8px 16px; font-size: var(--font-size-sm); }
+.btnLg { padding: 10px 20px; font-size: var(--font-size-base); }
+
+/* Variants */
+.btnPrimary {
+  background: var(--color-primary);
+  color: white;
+}
+.btnPrimary:hover:not(:disabled) {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-glow);
+}
+
+.btnSecondary {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
+}
+.btnSecondary:hover:not(:disabled) {
+  background: var(--color-surface-hover);
+  border-color: var(--color-border-hover);
+}
+
+.btnGhost {
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+.btnGhost:hover:not(:disabled) {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+}
+
+.btnDanger {
+  background: var(--color-error);
+  color: white;
+}
+.btnDanger:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.btnIcon {
+  padding: 8px;
+  aspect-ratio: 1;
+}
+
+/* ─── Input ─────────────────────────────────────────────────────── */
+.input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+.input::placeholder { color: var(--color-text-muted); }
+.input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-light); }
+
+/* ─── Badge ─────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+.badgeDefault { background: var(--color-surface); color: var(--color-text-secondary); }
+.badgeSuccess { background: rgba(52, 211, 153, 0.15); color: var(--color-success); }
+.badgeWarning { background: rgba(251, 191, 36, 0.15); color: var(--color-warning); }
+.badgeError   { background: rgba(248, 113, 113, 0.15); color: var(--color-error); }
+.badgeInfo    { background: rgba(96, 165, 250, 0.15); color: var(--color-info); }
+
+/* ─── Modal ─────────────────────────────────────────────────────── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  animation: fadeIn 0.15s ease-out;
+}
+.modalContent {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  max-width: 520px;
+  width: calc(100% - var(--space-8));
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-xl);
+  animation: scaleIn 0.15s ease-out;
+}
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+.modalTitle {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+}
+.modalClose {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast);
+}
+.modalClose:hover { color: var(--color-text-primary); }
+
+/* ─── Toast ─────────────────────────────────────────────────────── */
+.toastContainer {
+  position: fixed;
+  bottom: var(--space-6);
+  right: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  z-index: 200;
+  pointer-events: none;
+}
+.toast {
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  pointer-events: auto;
+  animation: slideUp 0.2s ease-out;
+  box-shadow: var(--shadow-lg);
+}
+.toastSuccess { background: var(--color-surface); border-left: 3px solid var(--color-success); color: var(--color-text-primary); }
+.toastError   { background: var(--color-surface); border-left: 3px solid var(--color-error); color: var(--color-text-primary); }
+.toastInfo    { background: var(--color-surface); border-left: 3px solid var(--color-info); color: var(--color-text-primary); }
+
+/* ─── Dropdown ──────────────────────────────────────────────────── */
+.dropdown {
+  position: relative;
+  display: inline-flex;
+}
+.dropdownMenu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 180px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-1);
+  box-shadow: var(--shadow-lg);
+  z-index: 50;
+  animation: scaleIn 0.1s ease-out;
+}
+.dropdownItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+.dropdownItem:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+.dropdownDivider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-1) 0;
+}
+
+/* ─── Animations ────────────────────────────────────────────────── */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }

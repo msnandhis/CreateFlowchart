@@ -1,0 +1,233 @@
+import { create } from "zustand";
+import type { FlowGraph, FlowNode, FlowEdge } from "@createflowchart/core";
+import { createEmptyFlowGraph, createStarterFlowGraph, validateFlowGraph, toReactFlowFormat, fromReactFlowFormat } from "@createflowchart/core";
+import type { Node, Edge, OnNodesChange, OnEdgesChange, OnConnect, Connection } from "@xyflow/react";
+import { applyNodeChanges, applyEdgeChanges, addEdge } from "@xyflow/react";
+
+type EditorMode = "sandbox" | "cloud";
+
+interface EditorState {
+  // ─── Core Data ────────────────────────────────────────────────
+  flowGraph: FlowGraph;
+  rfNodes: Node[];
+  rfEdges: Edge[];
+  flowId: string | null;
+  mode: EditorMode;
+  isDirty: boolean;
+  title: string;
+
+  // ─── Selection ────────────────────────────────────────────────
+  selectedNodeId: string | null;
+  selectedEdgeId: string | null;
+
+  // ─── Undo/Redo ────────────────────────────────────────────────
+  undoStack: FlowGraph[];
+  redoStack: FlowGraph[];
+
+  // ─── Actions ──────────────────────────────────────────────────
+  setFlowGraph: (fg: FlowGraph) => void;
+  loadFlow: (fg: FlowGraph, id: string | null, mode: EditorMode, title?: string) => void;
+  setTitle: (title: string) => void;
+
+  // React Flow handlers
+  onNodesChange: OnNodesChange;
+  onEdgesChange: OnEdgesChange;
+  onConnect: OnConnect;
+
+  // Node operations
+  addNode: (node: FlowNode) => void;
+  deleteSelected: () => void;
+  setSelectedNode: (id: string | null) => void;
+  setSelectedEdge: (id: string | null) => void;
+  updateNodeLabel: (id: string, label: string) => void;
+
+  // Undo/Redo
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+
+  // Utils
+  markClean: () => void;
+  getFlowGraph: () => FlowGraph;
+}
+
+function pushUndo(state: EditorState): Partial<EditorState> {
+  return {
+    undoStack: [...state.undoStack.slice(-49), state.flowGraph],
+    redoStack: [],
+  };
+}
+
+function syncFromFlowGraph(fg: FlowGraph): Pick<EditorState, "flowGraph" | "rfNodes" | "rfEdges" | "isDirty"> {
+  const { nodes, edges } = toReactFlowFormat(fg);
+  return { flowGraph: fg, rfNodes: nodes, rfEdges: edges, isDirty: true };
+}
+
+function syncFromReactFlow(nodes: Node[], edges: Edge[]): Pick<EditorState, "flowGraph" | "rfNodes" | "rfEdges" | "isDirty"> {
+  const fg = fromReactFlowFormat(nodes, edges);
+  return { flowGraph: fg, rfNodes: nodes, rfEdges: edges, isDirty: true };
+}
+
+const initialFg = createEmptyFlowGraph();
+const initial = toReactFlowFormat(initialFg);
+
+export const useEditorStore = create<EditorState>((set, get) => ({
+  flowGraph: initialFg,
+  rfNodes: initial.nodes,
+  rfEdges: initial.edges,
+  flowId: null,
+  mode: "sandbox",
+  isDirty: false,
+  title: "Untitled Flow",
+  selectedNodeId: null,
+  selectedEdgeId: null,
+  undoStack: [],
+  redoStack: [],
+
+  setFlowGraph: (fg) => {
+    set((s) => ({ ...pushUndo(s), ...syncFromFlowGraph(fg) }));
+  },
+
+  loadFlow: (fg, id, mode, title) => {
+    const { nodes, edges } = toReactFlowFormat(fg);
+    set({
+      flowGraph: fg,
+      rfNodes: nodes,
+      rfEdges: edges,
+      flowId: id,
+      mode,
+      isDirty: false,
+      title: title ?? "Untitled Flow",
+      undoStack: [],
+      redoStack: [],
+      selectedNodeId: null,
+      selectedEdgeId: null,
+    });
+  },
+
+  setTitle: (title) => set({ title, isDirty: true }),
+
+  onNodesChange: (changes) => {
+    set((s) => {
+      const updated = applyNodeChanges(changes, s.rfNodes);
+      return syncFromReactFlow(updated, s.rfEdges);
+    });
+  },
+
+  onEdgesChange: (changes) => {
+    set((s) => {
+      const updated = applyEdgeChanges(changes, s.rfEdges);
+      return syncFromReactFlow(s.rfNodes, updated);
+    });
+  },
+
+  onConnect: (connection: Connection) => {
+    set((s) => {
+      const updated = addEdge(
+        { ...connection, id: `e-${connection.source}-${connection.target}` },
+        s.rfEdges
+      );
+      return { ...pushUndo(s), ...syncFromReactFlow(s.rfNodes, updated) };
+    });
+  },
+
+  addNode: (node) => {
+    set((s) => {
+      const newFg: FlowGraph = {
+        ...s.flowGraph,
+        nodes: [...s.flowGraph.nodes, node],
+      };
+      return { ...pushUndo(s), ...syncFromFlowGraph(newFg) };
+    });
+  },
+
+  deleteSelected: () => {
+    const { selectedNodeId, selectedEdgeId } = get();
+    if (!selectedNodeId && !selectedEdgeId) return;
+
+    set((s) => {
+      let newFg = { ...s.flowGraph };
+      if (selectedNodeId) {
+        newFg = {
+          ...newFg,
+          nodes: newFg.nodes.filter((n) => n.id !== selectedNodeId),
+          edges: newFg.edges.filter(
+            (e) => e.source !== selectedNodeId && e.target !== selectedNodeId
+          ),
+        };
+      }
+      if (selectedEdgeId) {
+        newFg = {
+          ...newFg,
+          edges: newFg.edges.filter((e) => e.id !== selectedEdgeId),
+        };
+      }
+      return {
+        ...pushUndo(s),
+        ...syncFromFlowGraph(newFg),
+        selectedNodeId: null,
+        selectedEdgeId: null,
+      };
+    });
+  },
+
+  setSelectedNode: (id) => set({ selectedNodeId: id, selectedEdgeId: null }),
+  setSelectedEdge: (id) => set({ selectedEdgeId: id, selectedNodeId: null }),
+
+  updateNodeLabel: (id, label) => {
+    set((s) => {
+      const newFg: FlowGraph = {
+        ...s.flowGraph,
+        nodes: s.flowGraph.nodes.map((n) =>
+          n.id === id ? { ...n, data: { ...n.data, label } } : n
+        ),
+      };
+      return { ...pushUndo(s), ...syncFromFlowGraph(newFg) };
+    });
+  },
+
+  undo: () => {
+    set((s) => {
+      if (s.undoStack.length === 0) return s;
+      const prev = s.undoStack[s.undoStack.length - 1];
+      return {
+        undoStack: s.undoStack.slice(0, -1),
+        redoStack: [...s.redoStack, s.flowGraph],
+        ...syncFromFlowGraph(prev),
+      };
+    });
+  },
+
+  redo: () => {
+    set((s) => {
+      if (s.redoStack.length === 0) return s;
+      const next = s.redoStack[s.redoStack.length - 1];
+      return {
+        redoStack: s.redoStack.slice(0, -1),
+        undoStack: [...s.undoStack, s.flowGraph],
+        ...syncFromFlowGraph(next),
+      };
+    });
+  },
+
+  canUndo: () => get().undoStack.length > 0,
+  canRedo: () => get().redoStack.length > 0,
+  markClean: () => set({ isDirty: false }),
+
+  getFlowGraph: () => {
+    const result = validateFlowGraph(get().flowGraph);
+    return result.success ? result.data : get().flowGraph;
+  },
+}));
+
+// ─── Atomic selectors ──────────────────────────────────────────────
+export const useNodes = () => useEditorStore((s) => s.rfNodes);
+export const useEdges = () => useEditorStore((s) => s.rfEdges);
+export const useSelectedNode = () => {
+  const id = useEditorStore((s) => s.selectedNodeId);
+  const fg = useEditorStore((s) => s.flowGraph);
+  return id ? fg.nodes.find((n) => n.id === id) ?? null : null;
+};
+export const useEditorMode = () => useEditorStore((s) => s.mode);
+export const useIsDirty = () => useEditorStore((s) => s.isDirty);
