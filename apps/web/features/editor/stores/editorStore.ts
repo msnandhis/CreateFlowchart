@@ -3,11 +3,14 @@ import type { FlowGraph, FlowNode, FlowEdge } from "@createflowchart/core";
 import { createEmptyFlowGraph, createStarterFlowGraph, validateFlowGraph, toReactFlowFormat, fromReactFlowFormat } from "@createflowchart/core";
 import type { Node, Edge, OnNodesChange, OnEdgesChange, OnConnect, Connection } from "@xyflow/react";
 import { applyNodeChanges, applyEdgeChanges, addEdge } from "@xyflow/react";
+import type { DiagramDocument } from "@createflowchart/schema";
+import { createBlankFlowchartDocument, toDiagramDocument } from "../lib/document-compat";
 
 type EditorMode = "sandbox" | "cloud";
 
 interface EditorState {
   // ─── Core Data ────────────────────────────────────────────────
+  document: DiagramDocument;
   flowGraph: FlowGraph;
   rfNodes: Node[];
   rfEdges: Edge[];
@@ -60,20 +63,40 @@ function pushUndo(state: EditorState): Partial<EditorState> {
   };
 }
 
-function syncFromFlowGraph(fg: FlowGraph): Pick<EditorState, "flowGraph" | "rfNodes" | "rfEdges" | "isDirty"> {
+function syncFromFlowGraph(
+  fg: FlowGraph,
+  title?: string,
+): Pick<EditorState, "document" | "flowGraph" | "rfNodes" | "rfEdges" | "isDirty"> {
   const { nodes, edges } = toReactFlowFormat(fg);
-  return { flowGraph: fg, rfNodes: nodes, rfEdges: edges, isDirty: true };
+  return {
+    document: toDiagramDocument({ data: fg, title }),
+    flowGraph: fg,
+    rfNodes: nodes,
+    rfEdges: edges,
+    isDirty: true,
+  };
 }
 
-function syncFromReactFlow(nodes: Node[], edges: Edge[]): Pick<EditorState, "flowGraph" | "rfNodes" | "rfEdges" | "isDirty"> {
+function syncFromReactFlow(
+  nodes: Node[],
+  edges: Edge[],
+  title?: string,
+): Pick<EditorState, "document" | "flowGraph" | "rfNodes" | "rfEdges" | "isDirty"> {
   const fg = fromReactFlowFormat(nodes as any, edges as any);
-  return { flowGraph: fg, rfNodes: nodes, rfEdges: edges, isDirty: true };
+  return {
+    document: toDiagramDocument({ data: fg, title }),
+    flowGraph: fg,
+    rfNodes: nodes,
+    rfEdges: edges,
+    isDirty: true,
+  };
 }
 
 const initialFg = createEmptyFlowGraph();
 const initial = toReactFlowFormat(initialFg);
 
 export const useEditorStore = create<EditorState>((set, get) => ({
+  document: createBlankFlowchartDocument("Untitled Flow"),
   flowGraph: initialFg,
   rfNodes: initial.nodes,
   rfEdges: initial.edges,
@@ -87,12 +110,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   redoStack: [],
 
   setFlowGraph: (fg) => {
-    set((s) => ({ ...pushUndo(s), ...syncFromFlowGraph(fg) }));
+    set((s) => ({ ...pushUndo(s), ...syncFromFlowGraph(fg, s.title) }));
   },
 
   loadFlow: (fg, id, mode, title) => {
     const { nodes, edges } = toReactFlowFormat(fg);
     set({
+      document: toDiagramDocument({ id: id ?? undefined, title, data: fg }),
       flowGraph: fg,
       rfNodes: nodes,
       rfEdges: edges,
@@ -107,12 +131,28 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
-  setTitle: (title) => set({ title, isDirty: true }),
+  setTitle: (title) =>
+    set((s) => ({
+      title,
+      document: {
+        ...s.document,
+        metadata: {
+          ...s.document.metadata,
+          title,
+        },
+      },
+      isDirty: true,
+    })),
 
   setInitialData: (flow: any) => {
     const data = typeof flow.data === "string" ? JSON.parse(flow.data) : flow.data;
     const { nodes, edges } = toReactFlowFormat(data);
     set({
+      document: toDiagramDocument({
+        id: flow.id,
+        title: flow.title || "Untitled Flow",
+        data,
+      }),
       flowGraph: data,
       rfNodes: nodes,
       rfEdges: edges,
@@ -126,14 +166,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   onNodesChange: (changes) => {
     set((s) => {
       const updated = applyNodeChanges(changes, s.rfNodes);
-      return syncFromReactFlow(updated, s.rfEdges);
+      return syncFromReactFlow(updated, s.rfEdges, s.title);
     });
   },
 
   onEdgesChange: (changes) => {
     set((s) => {
       const updated = applyEdgeChanges(changes, s.rfEdges);
-      return syncFromReactFlow(s.rfNodes, updated);
+      return syncFromReactFlow(s.rfNodes, updated, s.title);
     });
   },
 
@@ -143,7 +183,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         { ...connection, id: `e-${connection.source}-${connection.target}` },
         s.rfEdges
       );
-      return { ...pushUndo(s), ...syncFromReactFlow(s.rfNodes, updated) };
+      return { ...pushUndo(s), ...syncFromReactFlow(s.rfNodes, updated, s.title) };
     });
   },
 
@@ -153,7 +193,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ...s.flowGraph,
         nodes: [...s.flowGraph.nodes, node],
       };
-      return { ...pushUndo(s), ...syncFromFlowGraph(newFg) };
+      return { ...pushUndo(s), ...syncFromFlowGraph(newFg, s.title) };
     });
   },
 
@@ -180,7 +220,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       return {
         ...pushUndo(s),
-        ...syncFromFlowGraph(newFg),
+        ...syncFromFlowGraph(newFg, s.title),
         selectedNodeId: null,
         selectedEdgeId: null,
       };
@@ -198,7 +238,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           n.id === id ? { ...n, data: { ...n.data, label } } : n
         ),
       };
-      return { ...pushUndo(s), ...syncFromFlowGraph(newFg) };
+      return { ...pushUndo(s), ...syncFromFlowGraph(newFg, s.title) };
     });
   },
 
@@ -209,7 +249,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         undoStack: s.undoStack.slice(0, -1),
         redoStack: [...s.redoStack, s.flowGraph],
-        ...syncFromFlowGraph(prev),
+        ...syncFromFlowGraph(prev, s.title),
       };
     });
   },
@@ -221,7 +261,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         redoStack: s.redoStack.slice(0, -1),
         undoStack: [...s.undoStack, s.flowGraph],
-        ...syncFromFlowGraph(next),
+        ...syncFromFlowGraph(next, s.title),
       };
     });
   },
