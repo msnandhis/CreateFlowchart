@@ -6,7 +6,11 @@ import { useEditorStore } from "../stores/editorStore";
 import styles from "../styles/container-layer.module.css";
 
 export const ContainerLayer = memo(function ContainerLayer() {
-  const containers = useEditorStore((state) => state.document.containers);
+  const containers = useEditorStore((state) =>
+    [...state.document.containers].sort(
+      (a, b) => b.size.width * b.size.height - a.size.width * a.size.height,
+    ),
+  );
   const selectedContainerId = useEditorStore((state) => state.selectedContainerId);
   const setSelectedContainer = useEditorStore((state) => state.setSelectedContainer);
 
@@ -30,6 +34,8 @@ export const ContainerLayer = memo(function ContainerLayer() {
                 top: container.position.y,
                 width: container.size.width,
                 height: container.size.height,
+                background: container.style.fill,
+                borderColor: container.style.stroke,
               }}
               onClick={(event) => {
                 event.stopPropagation();

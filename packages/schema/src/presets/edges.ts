@@ -1,0 +1,96 @@
+import type { DiagramKit, EdgeDefinition } from "../registry";
+
+export const flowchartEdges: EdgeDefinition[] = [
+  {
+    id: "flowchart-sequence-flow",
+    family: "flowchart",
+    kind: "flow",
+    displayName: "Flow",
+    defaultRouting: "orthogonal",
+    startMarker: "none",
+    endMarker: "arrow",
+    tags: ["flowchart", "default"],
+  },
+  {
+    id: "flowchart-conditional-flow",
+    family: "flowchart",
+    kind: "conditional-flow",
+    displayName: "Conditional Flow",
+    defaultRouting: "orthogonal",
+    startMarker: "none",
+    endMarker: "diamond",
+    tags: ["flowchart", "conditional"],
+  },
+  {
+    id: "flowchart-annotation-link",
+    family: "flowchart",
+    kind: "annotation-link",
+    displayName: "Annotation Link",
+    defaultRouting: "straight",
+    startMarker: "none",
+    endMarker: "none",
+    tags: ["flowchart", "annotation"],
+  },
+];
+
+export const bpmnEdges: EdgeDefinition[] = [
+  {
+    id: "bpmn-sequence-flow",
+    family: "bpmn",
+    kind: "flow",
+    displayName: "Sequence Flow",
+    defaultRouting: "orthogonal",
+    startMarker: "none",
+    endMarker: "arrow",
+    tags: ["bpmn", "sequence-flow"],
+  },
+  {
+    id: "bpmn-message-flow",
+    family: "bpmn",
+    kind: "message-flow",
+    displayName: "Message Flow",
+    defaultRouting: "smooth",
+    startMarker: "circle",
+    endMarker: "arrow",
+    tags: ["bpmn", "message-flow"],
+  },
+  {
+    id: "bpmn-association",
+    family: "bpmn",
+    kind: "association",
+    displayName: "Association",
+    defaultRouting: "straight",
+    startMarker: "none",
+    endMarker: "none",
+    tags: ["bpmn", "association"],
+  },
+];
+
+export const edgeKits: DiagramKit[] = [
+  {
+    id: "flowchart-edge-pack",
+    family: "flowchart",
+    displayName: "Flowchart Edge Pack",
+    description: "Default, conditional, and annotation edge semantics for flowcharts",
+    shapeIds: [],
+    edgeIds: flowchartEdges.map((edge) => edge.id),
+    containerIds: [],
+    supportsCodeMode: true,
+    supportsAutomation: false,
+    supportsSwimlanes: false,
+    tags: ["flowchart", "edges"],
+  },
+  {
+    id: "bpmn-edge-pack",
+    family: "bpmn",
+    displayName: "BPMN Edge Pack",
+    description: "Sequence, message, and association semantics for BPMN diagrams",
+    shapeIds: [],
+    edgeIds: bpmnEdges.map((edge) => edge.id),
+    containerIds: [],
+    supportsCodeMode: true,
+    supportsAutomation: false,
+    supportsSwimlanes: true,
+    tags: ["bpmn", "edges"],
+  },
+];

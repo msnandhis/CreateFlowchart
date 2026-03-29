@@ -6,8 +6,9 @@ import {
   type DiagramNode,
   type DiagramDocument,
   type EdgeRouting,
+  type Marker,
 } from "@createflowchart/schema";
-import type { Node, Edge } from "@xyflow/react";
+import { MarkerType, type Node, type Edge } from "@xyflow/react";
 import { getShapeDefinition } from "./flowchart-shapes";
 
 export function toDiagramDocument(input: {
@@ -156,6 +157,7 @@ export function documentToReactFlow(document: DiagramDocument) {
         kind: node.kind,
         shapeId: node.shape,
         size: node.size,
+        style: node.style,
         automation: node.automation,
         meta: {
           ...node.metadata,
@@ -167,6 +169,9 @@ export function documentToReactFlow(document: DiagramDocument) {
       style: {
         width: node.size.width,
         height: node.size.height,
+        background: node.style.fill,
+        borderColor: node.style.stroke,
+        color: node.style.textColor,
       },
     })),
     edges: document.edges.map((edge) => ({
@@ -176,21 +181,29 @@ export function documentToReactFlow(document: DiagramDocument) {
       sourceHandle: edge.sourcePortId,
       targetHandle: edge.targetPortId,
       label: edge.labels[0]?.text,
-      animated: false,
+      animated: edge.kind === "message-flow",
+      type: mapRoutingToReactFlow(edge.routing),
+      markerStart: toReactFlowMarker(edge.startMarker),
+      markerEnd: toReactFlowMarker(edge.endMarker),
       data: {
         confidence: edge.ai?.confidence,
         family: edge.family,
         kind: edge.kind,
         routing: edge.routing,
+        startMarker: edge.startMarker,
+        endMarker: edge.endMarker,
       },
-      ...(edge.ai?.confidence !== undefined && edge.ai.confidence < 0.7
-        ? {
-            style: {
-              stroke: "var(--color-node-low-confidence, #FFD60A)",
-              strokeWidth: 2,
-            },
-          }
-        : {}),
+      style: {
+        stroke:
+          edge.style.stroke ??
+          (edge.kind === "message-flow"
+            ? "var(--color-node-action)"
+            : "var(--color-node-process)"),
+        strokeWidth:
+          edge.ai?.confidence !== undefined && edge.ai.confidence < 0.7 ? 2.5 : 2,
+        strokeDasharray:
+          edge.kind === "message-flow" || edge.kind === "association" ? "6 4" : undefined,
+      },
     })),
   };
 }
@@ -203,6 +216,7 @@ export function reactFlowToDocument(
   const baseNodeMap = new Map(
     (baseDocument?.nodes ?? []).map((node) => [node.id, node]),
   );
+  const reactNodeMap = new Map(nodes.map((node) => [node.id, node]));
 
   return createDiagramDocument({
     id: baseDocument?.id,
@@ -310,6 +324,15 @@ export function reactFlowToDocument(
     edges: edges.map((edge) => {
       const baseEdge =
         baseDocument?.edges.find((base) => base.id === edge.id) ?? undefined;
+      const sourceNode = reactNodeMap.get(edge.source);
+      const sourceFamily =
+        asDiagramFamily(
+          typeof sourceNode?.data?.family === "string" ? sourceNode.data.family : undefined,
+        ) ?? baseEdge?.family ?? baseDocument?.family ?? "flowchart";
+      const inferredKind = inferEdgeKind(
+        sourceFamily,
+        typeof edge.label === "string" ? edge.label : undefined,
+      );
 
       return {
         id: edge.id,
@@ -323,7 +346,7 @@ export function reactFlowToDocument(
         kind:
           (typeof edge.data?.kind === "string" ? edge.data.kind : undefined) ??
           baseEdge?.kind ??
-          (edge.label ? "conditional-flow" : "flow"),
+          inferredKind,
         sourceNodeId: edge.source,
         sourcePortId: edge.sourceHandle ?? baseEdge?.sourcePortId,
         targetNodeId: edge.target,
@@ -339,7 +362,9 @@ export function reactFlowToDocument(
           ? [{ text: String(edge.label), position: "center" }]
           : baseEdge?.labels ?? [],
         startMarker: baseEdge?.startMarker ?? "none",
-        endMarker: baseEdge?.endMarker ?? "arrow",
+        endMarker:
+          baseEdge?.endMarker ??
+          (inferredKind === "conditional-flow" ? "diamond" : "arrow"),
         style: baseEdge?.style ?? { tokens: {} },
         metadata: baseEdge?.metadata ?? {},
         ai:
@@ -414,4 +439,46 @@ function asEdgeRouting(value: string | undefined): EdgeRouting | undefined {
   return value && EDGE_ROUTINGS.includes(value as EdgeRouting)
     ? (value as EdgeRouting)
     : undefined;
+}
+
+function mapRoutingToReactFlow(routing: EdgeRouting): "default" | "straight" | "step" | "smoothstep" {
+  switch (routing) {
+    case "straight":
+      return "straight";
+    case "orthogonal":
+      return "step";
+    case "smooth":
+      return "smoothstep";
+    case "bezier":
+      return "default";
+    case "manual":
+      return "straight";
+    default:
+      return "smoothstep";
+  }
+}
+
+function toReactFlowMarker(marker: Marker) {
+  switch (marker) {
+    case "arrow":
+    case "triangle":
+      return { type: MarkerType.ArrowClosed };
+    case "circle":
+      return { type: MarkerType.ArrowClosed, width: 18, height: 18 };
+    case "diamond":
+      return { type: MarkerType.Arrow };
+    default:
+      return undefined;
+  }
+}
+
+function inferEdgeKind(
+  family: DiagramFamily,
+  label?: string,
+): string {
+  if (family === "bpmn") {
+    return label ? "message-flow" : "flow";
+  }
+
+  return label ? "conditional-flow" : "flow";
 }

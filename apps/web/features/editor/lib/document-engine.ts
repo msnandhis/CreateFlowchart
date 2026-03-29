@@ -14,6 +14,7 @@ import {
   setDocumentTitle,
   undo as undoDocumentHistory,
   updateContainer as updateDocumentContainer,
+  updateEdge as updateDocumentEdge,
   updateNode as updateDocumentNode,
   replaceDocument as replaceEngineDocument,
   type EngineSelection,
@@ -23,6 +24,8 @@ import type {
   DiagramContainer,
   DiagramDocument,
   DiagramFamily,
+  EdgeRouting,
+  Marker,
 } from "@createflowchart/schema";
 import type { Edge, Node } from "@xyflow/react";
 import {
@@ -278,6 +281,23 @@ export function updateDocumentNodeSize(
   );
 }
 
+export function updateDocumentNodeStyle(
+  engineState: EngineState,
+  nodeId: string,
+  style: { fill?: string; stroke?: string; textColor?: string },
+): EditorProjection {
+  return projectEngineState(
+    updateDocumentNode(engineState, nodeId, (node) => ({
+      ...node,
+      style: {
+        ...node.style,
+        ...style,
+        tokens: node.style.tokens ?? {},
+      },
+    })),
+  );
+}
+
 export function updateDocumentNodeAutomation(
   engineState: EngineState,
   nodeId: string,
@@ -321,6 +341,59 @@ export function deleteSelectedEntities(
   }
 
   return projectEngineState(nextState);
+}
+
+export function updateDocumentEdgeLabel(
+  engineState: EngineState,
+  edgeId: string,
+  label: string,
+): EditorProjection {
+  return projectEngineState(
+    updateDocumentEdge(engineState, edgeId, (edge) => ({
+      ...edge,
+      labels: label.trim() ? [{ text: label.trim(), position: "center" }] : [],
+    })),
+  );
+}
+
+export function updateDocumentEdgeKind(
+  engineState: EngineState,
+  edgeId: string,
+  kind: string,
+): EditorProjection {
+  return projectEngineState(
+    updateDocumentEdge(engineState, edgeId, (edge) => ({
+      ...edge,
+      kind,
+    })),
+  );
+}
+
+export function updateDocumentEdgeRouting(
+  engineState: EngineState,
+  edgeId: string,
+  routing: EdgeRouting,
+): EditorProjection {
+  return projectEngineState(
+    updateDocumentEdge(engineState, edgeId, (edge) => ({
+      ...edge,
+      routing,
+    })),
+  );
+}
+
+export function updateDocumentEdgeMarkers(
+  engineState: EngineState,
+  edgeId: string,
+  markers: { startMarker?: Marker; endMarker?: Marker },
+): EditorProjection {
+  return projectEngineState(
+    updateDocumentEdge(engineState, edgeId, (edge) => ({
+      ...edge,
+      startMarker: markers.startMarker ?? edge.startMarker,
+      endMarker: markers.endMarker ?? edge.endMarker,
+    })),
+  );
 }
 
 export function undoEditor(engineState: EngineState): EditorProjection {
@@ -376,6 +449,62 @@ export function updateDocumentContainerSize(
       size,
     })),
   );
+}
+
+export function updateDocumentContainerStyle(
+  engineState: EngineState,
+  containerId: string,
+  style: { fill?: string; stroke?: string },
+): EditorProjection {
+  return projectEngineState(
+    updateDocumentContainer(engineState, containerId, (container) => ({
+      ...container,
+      style: {
+        ...container.style,
+        ...style,
+        tokens: container.style.tokens ?? {},
+      },
+    })),
+  );
+}
+
+export function assignContainerToParent(
+  engineState: EngineState,
+  containerId: string,
+  parentContainerId: string | null,
+): EditorProjection {
+  let nextState = updateDocumentContainer(engineState, containerId, (container) => ({
+    ...container,
+    metadata: {
+      ...container.metadata,
+      parentContainerId: parentContainerId ?? null,
+    },
+  }));
+
+  const touchedContainerIds = new Set(
+    nextState.document.containers
+      .filter((container) =>
+        container.childContainerIds.includes(containerId) || container.id === parentContainerId,
+      )
+      .map((container) => container.id),
+  );
+
+  for (const currentContainerId of touchedContainerIds) {
+    nextState = updateDocumentContainer(nextState, currentContainerId, (container) => {
+      const withoutChild = container.childContainerIds.filter((id) => id !== containerId);
+      const childContainerIds =
+        currentContainerId === parentContainerId
+          ? Array.from(new Set([...withoutChild, containerId]))
+          : withoutChild;
+
+      return {
+        ...container,
+        childContainerIds,
+      };
+    });
+  }
+
+  return projectEngineState(nextState);
 }
 
 export function assignNodeToContainer(

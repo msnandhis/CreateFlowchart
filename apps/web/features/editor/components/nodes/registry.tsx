@@ -16,6 +16,11 @@ interface DiagramNodeData {
     width: number;
     height: number;
   };
+  style?: {
+    fill?: string;
+    stroke?: string;
+    textColor?: string;
+  };
   meta?: Record<string, unknown>;
 }
 
@@ -84,6 +89,10 @@ function getGeometryClass(geometry: string) {
       return styles.geometryDelay;
     case "circle":
       return styles.geometryCircle;
+    case "double-circle":
+      return styles.geometryDoubleCircle;
+    case "note":
+      return styles.geometryNote;
     case "off-page-connector":
       return styles.geometryOffPageConnector;
     case "stored-data":
@@ -158,7 +167,15 @@ export const DiagramNodeRenderer = memo(function DiagramNodeRenderer({
         selected ? styles.nodeSelected : "",
         node.confidence !== undefined && node.confidence < 0.7 ? styles.lowConfidence : "",
       ].join(" ")}
-      style={{ width, minWidth: width, height, minHeight: height }}
+      style={{
+        width,
+        minWidth: width,
+        height,
+        minHeight: height,
+        background: node.style?.fill,
+        borderColor: node.style?.stroke,
+        color: node.style?.textColor,
+      }}
       title={definition?.description ?? paletteItem?.description}
     >
       <span className={`${styles.nodeIcon} ${getNodeTone(node.kind)}`}>

@@ -2,7 +2,12 @@ import { create } from "zustand";
 import type { ActionConfig, FlowGraph, FlowNode } from "@createflowchart/core";
 import { createEmptyFlowGraph, validateFlowGraph } from "@createflowchart/core";
 import type { EngineState } from "@createflowchart/engine";
-import type { DiagramContainer, DiagramDocument } from "@createflowchart/schema";
+import type {
+  DiagramContainer,
+  DiagramDocument,
+  EdgeRouting,
+  Marker,
+} from "@createflowchart/schema";
 import type {
   Connection,
   Edge,
@@ -14,6 +19,7 @@ import { addEdge, applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import {
   addLegacyNode,
   addDocumentContainerEntity,
+  assignContainerToParent,
   assignNodeToContainer,
   detectContainerForNode,
   applyReactFlowProjection,
@@ -29,9 +35,15 @@ import {
   undoEditor,
   updateDocumentContainerLabel,
   updateDocumentContainerSize,
+  updateDocumentContainerStyle,
+  updateDocumentEdgeKind,
+  updateDocumentEdgeLabel,
+  updateDocumentEdgeMarkers,
+  updateDocumentEdgeRouting,
   updateDocumentNodeAutomation,
   updateDocumentNodeShape,
   updateDocumentNodeSize,
+  updateDocumentNodeStyle,
   updateDocumentNodeTitle,
 } from "../lib/document-engine";
 import { createBlankFlowchartDocument, toDiagramDocument } from "../lib/document-compat";
@@ -85,12 +97,28 @@ interface EditorState {
     id: string,
     size: { width: number; height: number },
   ) => void;
+  updateNodeStyle: (
+    id: string,
+    style: { fill?: string; stroke?: string; textColor?: string },
+  ) => void;
+  updateEdgeLabel: (id: string, label: string) => void;
+  updateEdgeKind: (id: string, kind: string) => void;
+  updateEdgeRouting: (id: string, routing: EdgeRouting) => void;
+  updateEdgeMarkers: (
+    id: string,
+    markers: { startMarker?: Marker; endMarker?: Marker },
+  ) => void;
   updateContainerLabel: (id: string, label: string) => void;
   updateContainerSize: (
     id: string,
     size: { width: number; height: number },
   ) => void;
+  updateContainerStyle: (
+    id: string,
+    style: { fill?: string; stroke?: string },
+  ) => void;
   assignNodeContainer: (nodeId: string, containerId: string | null) => void;
+  assignContainerParent: (containerId: string, parentContainerId: string | null) => void;
   updateNodeAutomation: (id: string, config: ActionConfig | undefined) => void;
   createCheckpoint: (label?: string) => void;
   restoreCheckpoint: (id: string) => void;
@@ -349,6 +377,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     );
   },
 
+  updateNodeStyle: (id, style) => {
+    set((s) =>
+      syncFromProjection(updateDocumentNodeStyle(s.engineState, id, style)),
+    );
+  },
+
+  updateEdgeLabel: (id, label) => {
+    set((s) =>
+      syncFromProjection(updateDocumentEdgeLabel(s.engineState, id, label)),
+    );
+  },
+
+  updateEdgeKind: (id, kind) => {
+    set((s) =>
+      syncFromProjection(updateDocumentEdgeKind(s.engineState, id, kind)),
+    );
+  },
+
+  updateEdgeRouting: (id, routing) => {
+    set((s) =>
+      syncFromProjection(updateDocumentEdgeRouting(s.engineState, id, routing)),
+    );
+  },
+
+  updateEdgeMarkers: (id, markers) => {
+    set((s) =>
+      syncFromProjection(updateDocumentEdgeMarkers(s.engineState, id, markers)),
+    );
+  },
+
   updateContainerLabel: (id, label) => {
     set((s) =>
       syncFromProjection(updateDocumentContainerLabel(s.engineState, id, label)),
@@ -361,9 +419,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     );
   },
 
+  updateContainerStyle: (id, style) => {
+    set((s) =>
+      syncFromProjection(updateDocumentContainerStyle(s.engineState, id, style)),
+    );
+  },
+
   assignNodeContainer: (nodeId, containerId) => {
     set((s) =>
       syncFromProjection(assignNodeToContainer(s.engineState, nodeId, containerId)),
+    );
+  },
+
+  assignContainerParent: (containerId, parentContainerId) => {
+    set((s) =>
+      syncFromProjection(
+        assignContainerToParent(s.engineState, containerId, parentContainerId),
+      ),
     );
   },
 
@@ -435,6 +507,11 @@ export const useSelectedDocumentContainer = () => {
   const id = useEditorStore((s) => s.selectedContainerId);
   const document = useEditorStore((s) => s.document);
   return id ? document.containers.find((container) => container.id === id) ?? null : null;
+};
+export const useSelectedDocumentEdge = () => {
+  const id = useEditorStore((s) => s.selectedEdgeId);
+  const document = useEditorStore((s) => s.document);
+  return id ? document.edges.find((edge) => edge.id === id) ?? null : null;
 };
 export const useDocument = () => useEditorStore((s) => s.document);
 export const useSelectedNode = () => {

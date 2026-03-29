@@ -1,11 +1,14 @@
 import type { NodeType, FlowNode } from "@createflowchart/core";
 import {
+  bpmnEdges,
   bpmnLiteShapes,
   containerPresets,
+  flowchartEdges,
   flowchartShapes,
   type ContainerType,
   type DiagramContainer,
   type DiagramFamily,
+  type EdgeDefinition,
   type ShapeDefinition,
 } from "@createflowchart/schema";
 
@@ -71,6 +74,9 @@ export const paletteSections: Array<{
 export const shapeDefinitionMap: Record<string, ShapeDefinition> = Object.fromEntries(
   shapeLibrary.map((shape) => [shape.id, shape]),
 );
+export const edgeDefinitionMap: Record<string, EdgeDefinition> = Object.fromEntries(
+  [...flowchartEdges, ...bpmnEdges].map((edge) => [edge.id, edge]),
+);
 
 export function getPaletteItem(type: NodeType): FlowchartPaletteItem {
   return (
@@ -85,6 +91,10 @@ export function getPaletteItemByShapeId(shapeId: string): FlowchartPaletteItem |
 
 export function getShapeDefinition(shapeId: string): ShapeDefinition | null {
   return shapeDefinitionMap[shapeId] ?? null;
+}
+
+export function getEdgeDefinition(edgeId: string): EdgeDefinition | null {
+  return edgeDefinitionMap[edgeId] ?? null;
 }
 
 export interface ContainerPaletteItem {

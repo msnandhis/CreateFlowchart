@@ -65,3 +65,4 @@ export { migrateLegacyFlowGraph } from "./migrate";
 export { flowchartShapes, flowchartKit } from "./presets/flowchart";
 export { bpmnLiteShapes, bpmnLiteKit } from "./presets/bpmn";
 export { containerPresets } from "./presets/containers";
+export { flowchartEdges, bpmnEdges, edgeKits } from "./presets/edges";
