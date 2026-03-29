@@ -5,6 +5,7 @@ import { auth } from "@/shared/lib/auth";
 import { db } from "@/shared/lib/db";
 import { flows, users, flowLikes } from "@createflowchart/db/src/schema";
 import { eq, desc, sql } from "drizzle-orm";
+import { normalizePersistedFlow } from "@/features/editor/lib/persisted-flow";
 
 interface FlowWithAuthor {
   id: string;
@@ -64,20 +65,29 @@ export async function GET(req: Request) {
   }
 
   const flowsWithAuthor: FlowWithAuthor[] = results.map((f) => ({
-    id: f.id,
-    title: f.title,
-    data: f.data,
-    isPublic: f.isPublic,
-    likeCount: f.likeCount,
-    createdAt: f.createdAt,
-    updatedAt: f.updatedAt,
-    author: {
-      id: f.authorId,
-      name: f.authorName,
-      image: f.authorImage,
-    },
-    userLiked: userLikedFlowIds.has(f.id),
-  }));
+    const normalized = normalizePersistedFlow({
+      data: typeof f.data === "string" ? JSON.parse(f.data) : f.data,
+      id: f.id,
+      title: f.title,
+      authorId: f.authorId,
+    });
+
+    return {
+      id: f.id,
+      title: f.title,
+      data: normalized.legacy,
+      isPublic: f.isPublic,
+      likeCount: f.likeCount,
+      createdAt: f.createdAt,
+      updatedAt: f.updatedAt,
+      author: {
+        id: f.authorId,
+        name: f.authorName,
+        image: f.authorImage,
+      },
+      userLiked: userLikedFlowIds.has(f.id),
+    };
+  });
 
   const countResult = await db
     .select({ count: sql<number>`count(*)` })

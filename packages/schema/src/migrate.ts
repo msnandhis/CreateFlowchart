@@ -86,8 +86,14 @@ export function migrateLegacyFlowGraph(
     nodes: flowGraph.nodes.map((node) => ({
       id: node.id,
       family: "flowchart",
-      kind: inferKind(node.type),
-      shape: inferShape(node.type),
+      kind:
+        typeof node.data.meta.semanticKind === "string"
+          ? node.data.meta.semanticKind
+          : inferKind(node.type),
+      shape:
+        typeof node.data.meta.shapeId === "string"
+          ? node.data.meta.shapeId
+          : inferShape(node.type),
       position: node.position,
       size: { width: 180, height: node.type === "decision" ? 120 : 64 },
       ports: [],

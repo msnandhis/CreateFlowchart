@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { EditorShell } from "./EditorShell";
 import { useEditorStore } from "../stores/editorStore";
 import type { FlowGraph } from "@createflowchart/core";
+import type { DiagramDocument } from "@createflowchart/schema";
 
 interface CloudEditorProps {
   flowId: string;
@@ -11,6 +12,7 @@ interface CloudEditorProps {
     id: string;
     title: string;
     data: FlowGraph | string;
+    document?: DiagramDocument;
   };
 }
 
@@ -42,7 +44,7 @@ export function CloudEditor({ flowId, initialData }: CloudEditorProps) {
           throw new Error("Failed to load flow");
         }
         const data = await response.json();
-        loadFlow(data.flow, flowId, "cloud", data.title);
+        loadFlow(data.data, flowId, "cloud", data.title);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load");
       } finally {

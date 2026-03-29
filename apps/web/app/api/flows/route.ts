@@ -5,7 +5,7 @@ import { auth } from "@/shared/lib/auth";
 import { db } from "@/shared/lib/db";
 import { flows } from "@createflowchart/db";
 import { eq, desc } from "drizzle-orm";
-import { documentToFlowGraph, isDiagramDocument } from "@/features/editor/lib/document-compat";
+import { normalizePersistedFlow } from "@/features/editor/lib/persisted-flow";
 
 /**
  * GET /api/flows — List user flows
@@ -36,26 +36,27 @@ export async function POST(req: Request) {
     document,
   } = body;
 
-  const persistedData =
-    data ??
-    (isDiagramDocument(document)
-      ? documentToFlowGraph(document)
-      : { nodes: [], edges: [], meta: { version: 1, isSandbox: false } });
+  const normalized = normalizePersistedFlow({
+    data:
+      data ?? { nodes: [], edges: [], meta: { version: 1, isSandbox: false } },
+    document,
+    title,
+    authorId: session.user.id,
+  });
 
   const [newFlow] = await db
     .insert(flows)
     .values({
       userId: session.user.id,
       title,
-      data: persistedData,
+      data: normalized,
     })
     .returning();
 
   return NextResponse.json({
     ...newFlow,
-    document: isDiagramDocument(document)
-      ? document
-      : null,
-    formatVersion: "flowgraph-v1",
+    data: normalized.legacy,
+    document: normalized.document,
+    formatVersion: normalized.formatVersion,
   });
 }

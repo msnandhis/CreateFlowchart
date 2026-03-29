@@ -5,7 +5,6 @@ import {
   type UseCommandMenuOptions,
 } from "../hooks/use-command-menu";
 import { useEditorStore } from "../stores/editorStore";
-import type { NodeType } from "@createflowchart/core";
 import styles from "../styles/command-menu.module.css";
 import { createLegacyPaletteNode } from "../lib/flowchart-shapes";
 
@@ -39,8 +38,8 @@ export function CommandMenu({
     close,
     execute,
   } = useCommandMenu({
-    onAddNode: (type: NodeType) => {
-      addNodeByType(type);
+    onAddNode: (typeOrShapeId: string) => {
+      addNodeByType(typeOrShapeId);
       close();
     },
     onAutoLayout: () => {
@@ -79,8 +78,8 @@ export function CommandMenu({
     canRedo: useEditorStore((s) => s.canRedo()),
   });
 
-  const addNodeByType = (type: NodeType) => {
-    useEditorStore.getState().addNode(createLegacyPaletteNode(type));
+  const addNodeByType = (typeOrShapeId: string) => {
+    useEditorStore.getState().addNode(createLegacyPaletteNode(typeOrShapeId));
   };
 
   if (!isOpen) return null;

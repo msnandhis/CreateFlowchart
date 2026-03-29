@@ -14,7 +14,7 @@ interface Command {
 }
 
 export interface UseCommandMenuOptions {
-  onAddNode: (type: NodeType) => void;
+  onAddNode: (typeOrShapeId: string) => void;
   onAutoLayout: () => void;
   onGenerate: () => void;
   onAnalyze: () => void;
@@ -46,12 +46,12 @@ export function useCommandMenu({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const addCommands: Command[] = flowchartPalette.map((item) => ({
-    id: `add-${item.legacyType}`,
+    id: `add-${item.shapeId}`,
     label: `Add ${item.label}`,
     description: item.description,
     icon: item.icon,
     category: "add",
-    action: () => onAddNode(item.legacyType),
+    action: () => onAddNode(item.shapeId),
   }));
 
   const commands: Command[] = [

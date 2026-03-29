@@ -5,6 +5,7 @@ import { flows } from "@createflowchart/db";
 import { eq, and } from "drizzle-orm";
 import { redirect, notFound } from "next/navigation";
 import { headers } from "next/headers";
+import { normalizePersistedFlow } from "@/features/editor/lib/persisted-flow";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -40,5 +41,21 @@ export default async function EditorIdPage({ params }: PageProps) {
     notFound();
   }
 
-  return <EditorShell key={flow.id} initialData={flow} />;
+  const normalized = normalizePersistedFlow({
+    data: typeof flow.data === "string" ? JSON.parse(flow.data) : flow.data,
+    id: flow.id,
+    title: flow.title,
+    authorId: flow.userId,
+  });
+
+  return (
+    <EditorShell
+      key={flow.id}
+      initialData={{
+        ...flow,
+        data: normalized.legacy,
+        document: normalized.document,
+      }}
+    />
+  );
 }

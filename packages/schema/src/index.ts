@@ -62,3 +62,5 @@ export {
 } from "./registry";
 
 export { migrateLegacyFlowGraph } from "./migrate";
+export { flowchartShapes, flowchartKit } from "./presets/flowchart";
+export { bpmnLiteShapes, bpmnLiteKit } from "./presets/bpmn";

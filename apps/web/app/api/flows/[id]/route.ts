@@ -6,11 +6,7 @@ import { db } from "@/shared/lib/db";
 import { flows, users } from "@createflowchart/db";
 import { eq, and } from "drizzle-orm";
 import { headers } from "next/headers";
-import {
-  documentToFlowGraph,
-  isDiagramDocument,
-  toDiagramDocument,
-} from "@/features/editor/lib/document-compat";
+import { normalizePersistedFlow } from "@/features/editor/lib/persisted-flow";
 
 /**
  * Get Flow by ID
@@ -41,18 +37,19 @@ export async function GET(
     const author = await db.query.users.findFirst({
       where: eq(users.id, flow.userId),
     });
+    const normalized = normalizePersistedFlow({
+      data: typeof flow.data === "string" ? JSON.parse(flow.data) : flow.data,
+      id: flow.id,
+      title: flow.title,
+      authorId: flow.userId,
+    });
 
     return NextResponse.json({
       id: flow.id,
       title: flow.title,
-      data: flow.data,
-      document: toDiagramDocument({
-        id: flow.id,
-        title: flow.title,
-        data: typeof flow.data === "string" ? JSON.parse(flow.data) : flow.data,
-        authorId: flow.userId,
-      }),
-      formatVersion: "flowgraph-v1",
+      data: normalized.legacy,
+      document: normalized.document,
+      formatVersion: normalized.formatVersion,
       isPublic: flow.isPublic,
       isFeatured: flow.isFeatured,
       likeCount: flow.likeCount,
@@ -95,17 +92,25 @@ export async function PATCH(
 
     const body = await req.json();
     const { title, data, document, isPublic } = body;
-
-    const persistedData =
-      data ??
-      (isDiagramDocument(document) ? documentToFlowGraph(document) : undefined);
+    const normalized =
+      data !== undefined || document !== undefined
+        ? normalizePersistedFlow({
+            data:
+              data ??
+              { nodes: [], edges: [], meta: { version: 1, isSandbox: false } },
+            document,
+            id,
+            title,
+            authorId: session.user.id,
+          })
+        : null;
 
     // Build update object dynamically
     const updateData: any = {
       updatedAt: new Date(),
     };
     if (title !== undefined) updateData.title = title;
-    if (persistedData !== undefined) updateData.data = persistedData;
+    if (normalized) updateData.data = normalized;
     if (isPublic !== undefined) updateData.isPublic = isPublic;
 
     const result = await db
@@ -121,17 +126,9 @@ export async function PATCH(
     return NextResponse.json({
       success: true,
       flow: result[0],
-      document: isDiagramDocument(document)
-        ? document
-        : toDiagramDocument({
-            id: result[0].id,
-            title: result[0].title,
-            data: typeof result[0].data === "string"
-              ? JSON.parse(result[0].data)
-              : result[0].data,
-            authorId: result[0].userId,
-          }),
-      formatVersion: "flowgraph-v1",
+      document: normalized?.document,
+      data: normalized?.legacy,
+      formatVersion: normalized?.formatVersion ?? "flowgraph-v1+document-v2",
     });
   } catch (error: any) {
     console.error("[Flow Update Error]:", error);

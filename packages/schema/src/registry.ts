@@ -39,6 +39,7 @@ export const ShapeDefinitionSchema = z.object({
   labelZones: z.array(ShapeLabelZoneSchema).default([]),
   defaultTokens: z.record(z.string()).default({}),
   tags: z.array(z.string()).default([]),
+  metadata: z.record(z.unknown()).default({}),
 });
 export type ShapeDefinition = z.infer<typeof ShapeDefinitionSchema>;
 

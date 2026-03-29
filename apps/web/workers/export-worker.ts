@@ -13,6 +13,7 @@ import {
   exportAsPDFData,
   type ExportFormat,
 } from "../shared/lib/export-renderer";
+import { normalizePersistedFlow } from "../features/editor/lib/persisted-flow";
 
 export async function processExportJob(job: Job<ExportRenderJobData>): Promise<{
   success: boolean;
@@ -38,8 +39,13 @@ export async function processExportJob(job: Job<ExportRenderJobData>): Promise<{
       throw new Error(`Flow ${flowId} not found`);
     }
 
-    const flowGraph: FlowGraph =
-      typeof flow.data === "string" ? JSON.parse(flow.data) : flow.data;
+    const normalized = normalizePersistedFlow({
+      data: typeof flow.data === "string" ? JSON.parse(flow.data) : flow.data,
+      id: flow.id,
+      title: flow.title,
+      authorId: flow.userId,
+    });
+    const flowGraph: FlowGraph = normalized.legacy;
 
     await job.updateProgress(25);
 

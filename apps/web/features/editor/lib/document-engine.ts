@@ -21,6 +21,8 @@ import {
   documentToReactFlow,
   reactFlowToDocument,
 } from "./document-compat";
+import { getPaletteItemByShapeId } from "./flowchart-shapes";
+import type { ActionConfig } from "@createflowchart/core";
 
 export interface EditorProjection {
   engineState: EngineState;
@@ -69,11 +71,20 @@ export function addLegacyNode(
   engineState: EngineState,
   node: FlowNode,
 ): EditorProjection {
+  const shapeId =
+    typeof node.data.meta.shapeId === "string"
+      ? node.data.meta.shapeId
+      : undefined;
+  const paletteItem = shapeId ? getPaletteItemByShapeId(shapeId) : null;
+
   const nextState = addDocumentNode(engineState, {
     id: node.id,
     family: "flowchart",
     kind:
-      node.type === "start"
+      (typeof node.data.meta.semanticKind === "string"
+        ? node.data.meta.semanticKind
+        : paletteItem?.kind) ??
+      (node.type === "start"
         ? "start-event"
         : node.type === "end"
           ? "end-event"
@@ -81,17 +92,21 @@ export function addLegacyNode(
             ? "decision-gateway"
             : node.type === "action"
               ? "automation-task"
-              : "process-step",
+              : "process-step"),
     shape:
-      node.type === "decision"
+      shapeId ??
+      (node.type === "decision"
         ? "decision"
         : node.type === "action"
           ? "action-task"
           : node.type === "process"
             ? "process"
-            : "terminator",
+            : "terminator"),
     position: node.position,
-    size: { width: 180, height: node.type === "decision" ? 120 : 64 },
+    size: {
+      width: paletteItem?.defaultSize.width ?? 180,
+      height: paletteItem?.defaultSize.height ?? (node.type === "decision" ? 120 : 64),
+    },
     ports: [],
     content: {
       title: node.data.label,
@@ -138,6 +153,68 @@ export function updateDocumentNodeTitle(
   );
 }
 
+export function updateDocumentNodeShape(
+  engineState: EngineState,
+  nodeId: string,
+  shapeId: string,
+): EditorProjection {
+  const paletteItem = getPaletteItemByShapeId(shapeId);
+
+  return projectEngineState(
+    updateDocumentNode(engineState, nodeId, (node) => ({
+      ...node,
+      shape: shapeId,
+      kind: paletteItem?.kind ?? node.kind,
+      size: paletteItem
+        ? {
+            width: paletteItem.defaultSize.width,
+            height: paletteItem.defaultSize.height,
+          }
+        : node.size,
+      metadata: {
+        ...node.metadata,
+        shapeId,
+        semanticKind: paletteItem?.kind ?? node.kind,
+      },
+    })),
+  );
+}
+
+export function updateDocumentNodeSize(
+  engineState: EngineState,
+  nodeId: string,
+  size: { width: number; height: number },
+): EditorProjection {
+  return projectEngineState(
+    updateDocumentNode(engineState, nodeId, (node) => ({
+      ...node,
+      size,
+    })),
+  );
+}
+
+export function updateDocumentNodeAutomation(
+  engineState: EngineState,
+  nodeId: string,
+  config: ActionConfig | undefined,
+): EditorProjection {
+  return projectEngineState(
+    updateDocumentNode(engineState, nodeId, (node) => ({
+      ...node,
+      automation: config
+        ? {
+            actionType: "http",
+            endpoint: config.webhook_url,
+            method: config.method,
+            headers: config.headers,
+            payloadTemplate: config.payload_template,
+            metadata: {},
+          }
+        : undefined,
+    })),
+  );
+}
+
 export function deleteSelectedEntities(
   engineState: EngineState,
   selectedNodeId: string | null,
@@ -165,14 +242,14 @@ export function redoEditor(engineState: EngineState): EditorProjection {
 }
 
 export function selectNodeInEngine(
-  engineState: EngineState,
+  _engineState: EngineState,
   id: string | null,
 ): EngineSelection {
   return id ? selectNode(id) : clearSelection();
 }
 
 export function selectEdgeInEngine(
-  engineState: EngineState,
+  _engineState: EngineState,
   id: string | null,
 ): EngineSelection {
   return id ? selectEdge(id) : clearSelection();

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { FlowGraph, FlowNode } from "@createflowchart/core";
+import type { ActionConfig, FlowGraph, FlowNode } from "@createflowchart/core";
 import { createEmptyFlowGraph, validateFlowGraph } from "@createflowchart/core";
 import type { EngineState } from "@createflowchart/engine";
 import type { DiagramDocument } from "@createflowchart/schema";
@@ -22,6 +22,9 @@ import {
   selectNodeInEngine,
   setEditorTitle,
   undoEditor,
+  updateDocumentNodeAutomation,
+  updateDocumentNodeShape,
+  updateDocumentNodeSize,
   updateDocumentNodeTitle,
 } from "../lib/document-engine";
 import { createBlankFlowchartDocument, toDiagramDocument } from "../lib/document-compat";
@@ -57,6 +60,12 @@ interface EditorState {
   setSelectedNode: (id: string | null) => void;
   setSelectedEdge: (id: string | null) => void;
   updateNodeLabel: (id: string, label: string) => void;
+  updateNodeShape: (id: string, shapeId: string) => void;
+  updateNodeSize: (
+    id: string,
+    size: { width: number; height: number },
+  ) => void;
+  updateNodeAutomation: (id: string, config: ActionConfig | undefined) => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -141,7 +150,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     })),
 
   setInitialData: (flow: any) => {
-    const data = typeof flow.data === "string" ? JSON.parse(flow.data) : flow.data;
+    const data =
+      flow.document ??
+      (typeof flow.data === "string" ? JSON.parse(flow.data) : flow.data);
     const projection = createEditorProjection(
       toDiagramDocument({
         id: flow.id,
@@ -234,6 +245,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   updateNodeLabel: (id, label) => {
     set((s) =>
       syncFromProjection(updateDocumentNodeTitle(s.engineState, id, label)),
+    );
+  },
+
+  updateNodeShape: (id, shapeId) => {
+    set((s) =>
+      syncFromProjection(updateDocumentNodeShape(s.engineState, id, shapeId)),
+    );
+  },
+
+  updateNodeSize: (id, size) => {
+    set((s) =>
+      syncFromProjection(updateDocumentNodeSize(s.engineState, id, size)),
+    );
+  },
+
+  updateNodeAutomation: (id, config) => {
+    set((s) =>
+      syncFromProjection(
+        updateDocumentNodeAutomation(s.engineState, id, config),
+      ),
     );
   },
 

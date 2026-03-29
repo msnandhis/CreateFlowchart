@@ -4,15 +4,16 @@ import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
 import styles from "../../styles/nodes.module.css";
+import { getPaletteItemByShapeId } from "../../lib/flowchart-shapes";
 
 interface FlowNodeData {
   label: string;
   confidence?: number;
+  meta?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
 interface NodeRenderDefinition {
-  type: string;
   icon: string;
   className: string;
   iconClassName: string;
@@ -36,11 +37,35 @@ function ConfidenceBadge({ confidence }: { confidence?: number }) {
 function createRegistryNode(definition: NodeRenderDefinition) {
   return memo(function RegistryNode({ data, selected }: NodeProps) {
     const d = data as FlowNodeData;
-    const labelClassName = definition.labelClassName;
+    const shapeId =
+      typeof d.meta?.shapeId === "string" ? d.meta.shapeId : undefined;
+    const shapeItem = shapeId ? getPaletteItemByShapeId(shapeId) : null;
+    const renderVariant =
+      shapeItem?.shapeId === "document"
+        ? "document"
+        : shapeItem?.shapeId === "data"
+          ? "data"
+          : shapeItem?.shapeId === "database"
+            ? "database"
+            : shapeItem?.shapeId === "subprocess"
+              ? "subprocess"
+              : shapeItem?.shapeId === "manual-input"
+                ? "manual-input"
+                : shapeItem?.shapeId === "display"
+                  ? "display"
+                  : shapeItem?.shapeId === "connector"
+                    ? "connector"
+                    : null;
+
+    const activeDefinition =
+      renderVariant && nodeRenderRegistry[renderVariant]
+        ? nodeRenderRegistry[renderVariant]
+        : definition;
+    const labelClassName = activeDefinition.labelClassName;
 
     return (
       <div
-        className={`${styles.node} ${definition.className} ${
+        className={`${styles.node} ${activeDefinition.className} ${
           selected ? styles.nodeSelected : ""
         } ${
           d.confidence !== undefined && d.confidence < 0.7
@@ -48,10 +73,10 @@ function createRegistryNode(definition: NodeRenderDefinition) {
             : ""
         }`}
       >
-        <span className={`${styles.nodeIcon} ${definition.iconClassName}`}>
-          {definition.icon}
+        <span className={`${styles.nodeIcon} ${activeDefinition.iconClassName}`}>
+          {shapeItem?.icon ?? activeDefinition.icon}
         </span>
-        {definition.handles.map((handle) => (
+        {activeDefinition.handles.map((handle) => (
           <Handle
             key={`${handle.type}-${handle.position}-${handle.id ?? "default"}`}
             type={handle.type}
@@ -72,14 +97,12 @@ function createRegistryNode(definition: NodeRenderDefinition) {
 
 export const nodeRenderRegistry: Record<string, NodeRenderDefinition> = {
   start: {
-    type: "start",
     icon: "▶",
     className: styles.startNode,
     iconClassName: styles.startIcon,
     handles: [{ type: "source", position: Position.Bottom }],
   },
   process: {
-    type: "process",
     icon: "⚙",
     className: styles.processNode,
     iconClassName: styles.processIcon,
@@ -89,7 +112,6 @@ export const nodeRenderRegistry: Record<string, NodeRenderDefinition> = {
     ],
   },
   decision: {
-    type: "decision",
     icon: "◆",
     className: styles.decisionNode,
     iconClassName: styles.decisionIcon,
@@ -101,7 +123,6 @@ export const nodeRenderRegistry: Record<string, NodeRenderDefinition> = {
     labelClassName: styles.decisionLabel,
   },
   action: {
-    type: "action",
     icon: "⚡",
     className: styles.actionNode,
     iconClassName: styles.actionIcon,
@@ -111,11 +132,73 @@ export const nodeRenderRegistry: Record<string, NodeRenderDefinition> = {
     ],
   },
   end: {
-    type: "end",
     icon: "■",
     className: styles.endNode,
     iconClassName: styles.endIcon,
     handles: [{ type: "target", position: Position.Top }],
+  },
+  document: {
+    icon: "📄",
+    className: styles.processNode,
+    iconClassName: styles.processIcon,
+    handles: [
+      { type: "target", position: Position.Top },
+      { type: "source", position: Position.Bottom },
+    ],
+  },
+  data: {
+    icon: "⬒",
+    className: styles.processNode,
+    iconClassName: styles.processIcon,
+    handles: [
+      { type: "target", position: Position.Top },
+      { type: "source", position: Position.Bottom },
+    ],
+  },
+  database: {
+    icon: "🛢",
+    className: styles.processNode,
+    iconClassName: styles.processIcon,
+    handles: [
+      { type: "target", position: Position.Top },
+      { type: "source", position: Position.Bottom },
+    ],
+  },
+  subprocess: {
+    icon: "▤",
+    className: styles.processNode,
+    iconClassName: styles.processIcon,
+    handles: [
+      { type: "target", position: Position.Top },
+      { type: "source", position: Position.Bottom },
+    ],
+  },
+  "manual-input": {
+    icon: "⌨",
+    className: styles.processNode,
+    iconClassName: styles.processIcon,
+    handles: [
+      { type: "target", position: Position.Top },
+      { type: "source", position: Position.Bottom },
+    ],
+  },
+  display: {
+    icon: "🖵",
+    className: styles.processNode,
+    iconClassName: styles.processIcon,
+    handles: [
+      { type: "target", position: Position.Top },
+      { type: "source", position: Position.Bottom },
+    ],
+  },
+  connector: {
+    icon: "○",
+    className: styles.processNode,
+    iconClassName: styles.processIcon,
+    handles: [
+      { type: "target", position: Position.Top },
+      { type: "source", position: Position.Bottom },
+    ],
   },
 };
 
