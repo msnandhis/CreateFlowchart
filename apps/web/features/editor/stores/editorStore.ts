@@ -38,6 +38,13 @@ import { createBlankFlowchartDocument, toDiagramDocument } from "../lib/document
 
 type EditorMode = "sandbox" | "cloud";
 
+interface EditorCheckpoint {
+  id: string;
+  label: string;
+  createdAt: string;
+  document: DiagramDocument;
+}
+
 interface EditorState {
   engineState: EngineState;
   document: DiagramDocument;
@@ -48,6 +55,7 @@ interface EditorState {
   mode: EditorMode;
   isDirty: boolean;
   title: string;
+  checkpoints: EditorCheckpoint[];
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
   selectedContainerId: string | null;
@@ -84,6 +92,8 @@ interface EditorState {
   ) => void;
   assignNodeContainer: (nodeId: string, containerId: string | null) => void;
   updateNodeAutomation: (id: string, config: ActionConfig | undefined) => void;
+  createCheckpoint: (label?: string) => void;
+  restoreCheckpoint: (id: string) => void;
   undo: () => void;
   redo: () => void;
   canUndo: () => boolean;
@@ -124,6 +134,22 @@ const initialFg = createEmptyFlowGraph();
 const initialDocument = createBlankFlowchartDocument("Untitled Flow");
 const initial = createEditorProjection(initialDocument);
 
+function createCheckpointRecord(
+  document: DiagramDocument,
+  label?: string,
+): EditorCheckpoint {
+  const createdAt = new Date().toISOString();
+  return {
+    id:
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `checkpoint-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    label: label?.trim() || `Checkpoint ${new Date(createdAt).toLocaleString()}`,
+    createdAt,
+    document,
+  };
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   engineState: initial.engineState,
   document: initial.document,
@@ -134,6 +160,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   mode: "sandbox",
   isDirty: false,
   title: "Untitled Flow",
+  checkpoints: [],
   selectedNodeId: null,
   selectedEdgeId: null,
   selectedContainerId: null,
@@ -164,6 +191,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       mode,
       isDirty: false,
       title: title ?? "Untitled Flow",
+      checkpoints: [],
       selectedNodeId: null,
       selectedEdgeId: null,
       selectedContainerId: null,
@@ -196,6 +224,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       rfEdges: projection.rfEdges,
       title: flow.title || "Untitled Flow",
       isDirty: false,
+      checkpoints: [],
       selectedNodeId: null,
       selectedEdgeId: null,
       selectedContainerId: null,
@@ -346,6 +375,31 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     );
   },
 
+  createCheckpoint: (label) => {
+    set((s) => ({
+      checkpoints: [createCheckpointRecord(s.document, label), ...s.checkpoints].slice(
+        0,
+        12,
+      ),
+    }));
+  },
+
+  restoreCheckpoint: (id) => {
+    set((s) => {
+      const checkpoint = s.checkpoints.find((entry) => entry.id === id);
+      if (!checkpoint) {
+        return s;
+      }
+
+      return {
+        title: checkpoint.document.metadata.title,
+        ...syncFromProjection(
+          replaceEditorDocument(s.engineState, checkpoint.document),
+        ),
+      };
+    });
+  },
+
   undo: () => {
     set((s) => {
       if (s.engineState.history.past.length === 0) return s;
@@ -390,3 +444,4 @@ export const useSelectedNode = () => {
 };
 export const useEditorMode = () => useEditorStore((s) => s.mode);
 export const useIsDirty = () => useEditorStore((s) => s.isDirty);
+export const useCheckpoints = () => useEditorStore((s) => s.checkpoints);

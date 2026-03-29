@@ -54,7 +54,7 @@ export function usePresence({
         if (state.user) {
           newUsers.set(clientId, {
             ...state.user,
-            cursor: state.cursor,
+            cursor: state.user.cursor ?? state.cursor,
           });
         }
       });

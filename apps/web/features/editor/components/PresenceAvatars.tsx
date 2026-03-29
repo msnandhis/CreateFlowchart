@@ -28,7 +28,11 @@ export function PresenceAvatars({
   }
 
   return (
-    <div className={styles.avatars}>
+    <div className={styles.presenceGroup}>
+      <span className={styles.presenceLabel}>
+        {userList.length} live
+      </span>
+      <div className={styles.avatars}>
       {displayUsers.map((user) => (
         <div
           key={user.id}
@@ -42,6 +46,7 @@ export function PresenceAvatars({
       {remainingCount > 0 && (
         <div className={styles.avatarMore}>+{remainingCount}</div>
       )}
+      </div>
     </div>
   );
 }

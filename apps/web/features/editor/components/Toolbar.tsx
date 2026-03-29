@@ -5,19 +5,45 @@ import { Button } from "@/shared/ui/Button";
 import styles from "../styles/toolbar.module.css";
 import { useLayout } from "../hooks/use-layout";
 import { ConnectionStatus } from "./ConnectionStatus";
+import { PresenceAvatars } from "./PresenceAvatars";
 
 export type EditorSurfaceMode = "canvas" | "split" | "code";
+
+interface EditorCheckpoint {
+  id: string;
+  label: string;
+  createdAt: string;
+}
 
 interface ToolbarProps {
   surfaceMode: EditorSurfaceMode;
   onSurfaceModeChange: (mode: EditorSurfaceMode) => void;
   connectionStatus?: "disconnected" | "connecting" | "connected";
+  onReconnect?: () => void;
+  remoteUsers?: Map<
+    number,
+    {
+      id: string;
+      name: string;
+      color: string;
+      cursor?: { x: number; y: number };
+      lastActive: number;
+    }
+  >;
+  checkpoints?: EditorCheckpoint[];
+  onCreateCheckpoint?: () => void;
+  onRestoreCheckpoint?: (id: string) => void;
 }
 
 export function Toolbar({
   surfaceMode,
   onSurfaceModeChange,
   connectionStatus = "disconnected",
+  onReconnect,
+  remoteUsers = new Map(),
+  checkpoints = [],
+  onCreateCheckpoint,
+  onRestoreCheckpoint,
 }: ToolbarProps) {
   const title = useEditorStore((s) => s.title);
   const setTitle = useEditorStore((s) => s.setTitle);
@@ -83,12 +109,48 @@ export function Toolbar({
 
       <div className={styles.spacer} />
 
+      <div className={styles.group}>
+        <Button
+          variant="ghost"
+          size="sm"
+          title="Create checkpoint"
+          onClick={onCreateCheckpoint}
+        >
+          Checkpoint
+        </Button>
+        <select
+          className={styles.checkpointSelect}
+          aria-label="Restore checkpoint"
+          defaultValue=""
+          onChange={(event) => {
+            if (!event.target.value) return;
+            onRestoreCheckpoint?.(event.target.value);
+            event.target.value = "";
+          }}
+        >
+          <option value="">Restore checkpoint</option>
+          {checkpoints.map((checkpoint) => (
+            <option key={checkpoint.id} value={checkpoint.id}>
+              {checkpoint.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {remoteUsers.size > 0 ? <PresenceAvatars users={remoteUsers} /> : null}
+
       {/* Save Status */}
       <span className={`${styles.saveIndicator} ${isDirty ? styles.dirty : ""}`}>
         {isDirty ? "Unsaved changes" : "Saved"}
       </span>
 
       <ConnectionStatus status={connectionStatus} />
+
+      {connectionStatus === "disconnected" && onReconnect ? (
+        <Button variant="ghost" size="sm" onClick={onReconnect}>
+          Reconnect
+        </Button>
+      ) : null}
 
       <div className={styles.group}>
         <Button variant="ghost" size="sm" title="Export">

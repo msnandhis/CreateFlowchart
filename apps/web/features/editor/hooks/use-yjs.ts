@@ -1,8 +1,9 @@
-import { useEffect, useRef, useCallback, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { useEditorStore } from "../stores/editorStore";
 import type { DiagramDocument } from "@createflowchart/schema";
+import { useSession } from "@/shared/lib/auth-client";
 
 const REALTIME_URL =
   process.env.NEXT_PUBLIC_REALTIME_URL || "ws://localhost:4000";
@@ -23,22 +24,12 @@ function generateUserColor(): string {
   return colors[Math.floor(Math.random() * colors.length)];
 }
 
-interface UserPresence {
-  id: string;
-  name: string;
-  color: string;
-  cursor?: { x: number; y: number } | null;
-  lastActive: number;
-}
-
-/**
- * Hook to synchronize the EditorStore with a Yjs document via WebSockets.
- * Handles nodes, edges, and presence (cursors).
- */
 export function useYjs(flowId: string | null) {
+  const { data: session, isPending } = useSession();
   const [connectionStatus, setConnectionStatus] = useState<
     "disconnected" | "connecting" | "connected"
   >("disconnected");
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const document = useEditorStore((s) => s.document);
   const setDocument = useEditorStore((s) => s.setDocument);
   const ydocRef = useRef<Y.Doc | null>(null);
@@ -50,31 +41,80 @@ export function useYjs(flowId: string | null) {
   );
   const userColorRef = useRef(generateUserColor());
 
-  const updateLocalCursor = useCallback((x: number, y: number) => {
-    const provider = providerRef.current;
-    if (!provider) return;
-
-    const currentState = provider.awareness.getLocalState();
-    const userPresence: UserPresence = {
-      id: userIdRef.current,
-      name: "User",
-      color: userColorRef.current,
-      cursor: { x, y },
-      lastActive: Date.now(),
-    };
-
-    provider.awareness.setLocalStateField("user", userPresence);
-  }, []);
+  const userName =
+    session?.user.name ?? session?.user.email ?? "Collaborator";
 
   useEffect(() => {
-    if (!flowId) return;
+    if (session?.user.id) {
+      userIdRef.current = session.user.id;
+    }
+  }, [session?.user.id]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadToken() {
+      if (!flowId) {
+        setAuthToken(null);
+        return;
+      }
+
+      if (isPending) {
+        setConnectionStatus("connecting");
+        return;
+      }
+
+      if (!session) {
+        setAuthToken(null);
+        setConnectionStatus("disconnected");
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/realtime/token", {
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to create realtime token");
+        }
+
+        const payload = (await response.json()) as { token: string };
+        if (!cancelled) {
+          setAuthToken(payload.token);
+        }
+      } catch {
+        if (!cancelled) {
+          setAuthToken(null);
+          setConnectionStatus("disconnected");
+        }
+      }
+    }
+
+    void loadToken();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [flowId, isPending, session]);
+
+  useEffect(() => {
+    if (!flowId || !authToken || !session) return;
 
     const doc = new Y.Doc();
     const provider = new WebsocketProvider(
       REALTIME_URL,
       `flow-${flowId}`,
       doc,
-      { connect: true },
+      {
+        connect: true,
+        params: {
+          token: authToken,
+          userId: userIdRef.current,
+          name: userName,
+          color: userColorRef.current,
+        },
+      },
     );
     setConnectionStatus("connecting");
 
@@ -83,18 +123,8 @@ export function useYjs(flowId: string | null) {
 
     const yDiagram = doc.getMap<string>("diagram");
 
-    provider.awareness.setLocalStateField("user", {
-      id: userIdRef.current,
-      name: "User",
-      color: userColorRef.current,
-      cursor: null,
-      lastActive: Date.now(),
-    } as UserPresence);
-
     provider.on("status", ({ status }: { status: string }) => {
-      setConnectionStatus(
-        status === "connected" ? "connected" : "connecting",
-      );
+      setConnectionStatus(status as "disconnected" | "connecting" | "connected");
     });
 
     const handleYDocumentUpdate = () => {
@@ -135,7 +165,7 @@ export function useYjs(flowId: string | null) {
       doc.destroy();
       setConnectionStatus("disconnected");
     };
-  }, [flowId, setDocument]);
+  }, [authToken, flowId, session, setDocument, userName]);
 
   useEffect(() => {
     const doc = ydocRef.current;
@@ -153,5 +183,15 @@ export function useYjs(flowId: string | null) {
     lastSerializedDocumentRef.current = serialized;
   }, [document]);
 
-  return { provider: providerRef.current, updateLocalCursor, connectionStatus };
+  return {
+    provider: providerRef.current,
+    connectionStatus,
+    reconnect: () => providerRef.current?.connect(),
+    disconnect: () => providerRef.current?.disconnect(),
+    presenceIdentity: {
+      userId: userIdRef.current,
+      userName,
+      userColor: userColorRef.current,
+    },
+  };
 }

@@ -5,6 +5,7 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { useEditorStore } from "../stores/editorStore";
 import type { DiagramDocument } from "@createflowchart/schema";
+import { useSession } from "@/shared/lib/auth-client";
 
 const REALTIME_URL =
   process.env.NEXT_PUBLIC_REALTIME_URL || "ws://localhost:4000";
@@ -28,11 +29,13 @@ export function useYjsSync({
   userName = "Anonymous",
   userColor = "#3b82f6",
 }: UseYjsSyncOptions) {
+  const { data: session, isPending } = useSession();
   const [syncState, setSyncState] = useState<SyncState>({
     isConnected: false,
     isSynced: false,
     connectionStatus: "disconnected",
   });
+  const [authToken, setAuthToken] = useState<string | null>(null);
 
   const document = useEditorStore((s) => s.document);
   const setDocument = useEditorStore((s) => s.setDocument);
@@ -42,7 +45,63 @@ export function useYjsSync({
   const lastSerializedDocumentRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!flowId) return;
+    let cancelled = false;
+
+    async function loadToken() {
+      if (!flowId) {
+        setAuthToken(null);
+        return;
+      }
+
+      if (isPending) {
+        setSyncState((prev) => ({ ...prev, connectionStatus: "connecting" }));
+        return;
+      }
+
+      if (!session) {
+        setAuthToken(null);
+        setSyncState({
+          isConnected: false,
+          isSynced: false,
+          connectionStatus: "disconnected",
+        });
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/realtime/token", {
+          credentials: "include",
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to create realtime token");
+        }
+
+        const payload = (await response.json()) as { token: string };
+        if (!cancelled) {
+          setAuthToken(payload.token);
+        }
+      } catch {
+        if (!cancelled) {
+          setAuthToken(null);
+          setSyncState({
+            isConnected: false,
+            isSynced: false,
+            connectionStatus: "disconnected",
+          });
+        }
+      }
+    }
+
+    void loadToken();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [flowId, isPending, session]);
+
+  useEffect(() => {
+    if (!flowId || !authToken || !session) return;
 
     setSyncState((prev) => ({ ...prev, connectionStatus: "connecting" }));
 
@@ -51,7 +110,15 @@ export function useYjsSync({
       REALTIME_URL,
       `flow-${flowId}`,
       doc,
-      { connect: true },
+      {
+        connect: true,
+        params: {
+          token: authToken,
+          userId: userId ?? session.user.id,
+          name: userName || session.user.name || session.user.email || "Collaborator",
+          color: userColor,
+        },
+      },
     );
 
     ydocRef.current = doc;
@@ -95,7 +162,7 @@ export function useYjsSync({
         connectionStatus: "disconnected",
       });
     };
-  }, [flowId, setDocument]);
+  }, [authToken, flowId, session, setDocument, userColor, userId, userName]);
 
   useEffect(() => {
     const doc = ydocRef.current;

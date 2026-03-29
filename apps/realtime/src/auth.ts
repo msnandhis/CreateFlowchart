@@ -35,6 +35,7 @@ export function extractToken(req: IncomingMessage): string | null {
 export function authWebSocket(req: IncomingMessage): {
   authorized: boolean;
   userId?: string;
+  name?: string;
   error?: string;
 } {
   const token = extractToken(req);
@@ -48,5 +49,9 @@ export function authWebSocket(req: IncomingMessage): {
     return { authorized: false, error: "Invalid token" };
   }
 
-  return { authorized: true, userId: payload.userId };
+  return {
+    authorized: true,
+    userId: payload.userId,
+    name: payload.name,
+  };
 }

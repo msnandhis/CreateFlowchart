@@ -12,6 +12,7 @@ import { useYjs } from "../hooks/use-yjs";
 import { useAutosave } from "../hooks/use-autosave";
 import { useShortcuts } from "../hooks/use-shortcuts";
 import { useAutoLayout } from "../hooks/use-auto-layout";
+import { usePresence } from "../hooks/use-presence";
 import styles from "../styles/editor-shell.module.css";
 
 interface EditorShellProps {
@@ -30,14 +31,23 @@ export function EditorShell({
   onOpenImport,
 }: EditorShellProps) {
   const setInitialData = useEditorStore((s) => s.setInitialData);
+  const createCheckpoint = useEditorStore((s) => s.createCheckpoint);
+  const restoreCheckpoint = useEditorStore((s) => s.restoreCheckpoint);
+  const checkpoints = useEditorStore((s) => s.checkpoints);
   const { runLayout } = useAutoLayout();
   const [surfaceMode, setSurfaceMode] = useState<"canvas" | "split" | "code">(
     "split",
   );
 
-  const { provider, updateLocalCursor, connectionStatus } = useYjs(
+  const { provider, connectionStatus, reconnect, presenceIdentity } = useYjs(
     initialData?.id,
   );
+  const { users, updateCursor, clearCursor } = usePresence({
+    provider,
+    userId: presenceIdentity.userId,
+    userName: presenceIdentity.userName,
+    userColor: presenceIdentity.userColor,
+  });
 
   useAutosave();
   useShortcuts();
@@ -54,11 +64,20 @@ export function EditorShell({
         surfaceMode={surfaceMode}
         onSurfaceModeChange={setSurfaceMode}
         connectionStatus={connectionStatus}
+        onReconnect={reconnect}
+        remoteUsers={users}
+        checkpoints={checkpoints}
+        onCreateCheckpoint={() => createCheckpoint()}
+        onRestoreCheckpoint={restoreCheckpoint}
       />
       <div className={styles.workspace}>
         {surfaceMode !== "code" ? (
           <main className={styles.canvasPane}>
-            <Canvas provider={provider} updateLocalCursor={updateLocalCursor} />
+            <Canvas
+              remoteUsers={users}
+              updateLocalCursor={updateCursor}
+              clearLocalCursor={clearCursor}
+            />
           </main>
         ) : null}
         {surfaceMode !== "canvas" ? <CodePanel /> : null}

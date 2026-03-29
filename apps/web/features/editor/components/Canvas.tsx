@@ -15,16 +15,29 @@ import "@xyflow/react/dist/style.css";
 import { useEditorStore, useNodes, useEdges } from "../stores/editorStore";
 import { nodeTypes } from "./nodes";
 import styles from "../styles/canvas.module.css";
-import type { WebsocketProvider } from "y-websocket";
 import { PresenceLayer } from "./PresenceLayer";
 import { ContainerLayer } from "./ContainerLayer";
 
 interface CanvasProps {
-  provider: WebsocketProvider | null;
+  remoteUsers: Map<
+    number,
+    {
+      id: string;
+      name: string;
+      color: string;
+      cursor?: { x: number; y: number };
+      lastActive: number;
+    }
+  >;
   updateLocalCursor?: (x: number, y: number) => void;
+  clearLocalCursor?: () => void;
 }
 
-export function Canvas({ provider, updateLocalCursor }: CanvasProps) {
+export function Canvas({
+  remoteUsers,
+  updateLocalCursor,
+  clearLocalCursor,
+}: CanvasProps) {
   const nodes = useNodes();
   const edges = useEdges();
 
@@ -58,7 +71,11 @@ export function Canvas({ provider, updateLocalCursor }: CanvasProps) {
   };
 
   return (
-    <div className={styles.canvas} onPointerMove={handlePointerMove}>
+    <div
+      className={styles.canvas}
+      onPointerMove={handlePointerMove}
+      onPointerLeave={clearLocalCursor}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -95,7 +112,7 @@ export function Canvas({ provider, updateLocalCursor }: CanvasProps) {
           style={{ width: 160, height: 100 }}
         />
         <ContainerLayer />
-        <PresenceLayer provider={provider} />
+        <PresenceLayer users={remoteUsers} />
       </ReactFlow>
     </div>
   );
