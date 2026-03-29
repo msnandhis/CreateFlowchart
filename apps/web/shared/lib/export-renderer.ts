@@ -1,5 +1,5 @@
 import type { DiagramDocument } from "@createflowchart/schema";
-import { documentToMermaid } from "@createflowchart/dsl";
+import { documentToMermaidWithDiagnostics } from "@createflowchart/dsl";
 import { renderDocumentToSvg } from "@createflowchart/render";
 
 export type ExportFormat = "png" | "svg" | "pdf" | "mermaid" | "json";
@@ -9,6 +9,7 @@ export interface ExportResult {
   format: ExportFormat;
   content?: string;
   fileSize?: number;
+  warnings?: string[];
 }
 
 export function exportAsJSON(document: DiagramDocument): ExportResult {
@@ -22,12 +23,16 @@ export function exportAsJSON(document: DiagramDocument): ExportResult {
 }
 
 export function exportAsMermaid(document: DiagramDocument): ExportResult {
-  const mermaid = documentToMermaid(document);
+  const mermaidResult = documentToMermaidWithDiagnostics(document);
+  const mermaid = mermaidResult.content;
   return {
     success: true,
     format: "mermaid",
     content: mermaid,
     fileSize: Buffer.byteLength(mermaid, "utf-8"),
+    warnings: mermaidResult.diagnostics
+      .filter((diagnostic) => diagnostic.severity !== "info")
+      .map((diagnostic) => diagnostic.message),
   };
 }
 

@@ -6,14 +6,15 @@ import { Button } from "@/shared/ui/Button";
 import { Input } from "@/shared/ui/Input";
 import styles from "../styles/dashboard.module.css";
 import {
-  parseDslDocument,
-  parseMermaidDocument,
+  parseDslDocumentDetailed,
+  parseMermaidDocumentDetailed,
 } from "@/features/editor/lib/document-codec";
 import {
   isDiagramDocument,
   toDiagramDocument,
 } from "@/features/editor/lib/document-compat";
 import type { DiagramDocument } from "@createflowchart/schema";
+import type { DslDiagnostic } from "@createflowchart/dsl";
 
 interface ImportModalProps {
   open: boolean;
@@ -26,6 +27,7 @@ export function ImportModal({ open, onClose, onImport }: ImportModalProps) {
   const [format, setFormat] = useState<"json" | "dsl" | "mermaid">("json");
   const [jsonContent, setJsonContent] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<DslDiagnostic[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -45,9 +47,11 @@ export function ImportModal({ open, onClose, onImport }: ImportModalProps) {
       }
 
       try {
-        validateImportContent(content, format, title);
+        const result = validateImportContent(content, format, title);
+        setDiagnostics(result.diagnostics);
       } catch {
         setError("Invalid content format");
+        setDiagnostics([]);
       }
     };
     reader.readAsText(file);
@@ -59,9 +63,11 @@ export function ImportModal({ open, onClose, onImport }: ImportModalProps) {
     setError(null);
 
     try {
-      validateImportContent(content, format, title);
+      const result = validateImportContent(content, format, title);
+      setDiagnostics(result.diagnostics);
     } catch {
       setError("Invalid content format");
+      setDiagnostics([]);
     }
   };
 
@@ -90,6 +96,7 @@ export function ImportModal({ open, onClose, onImport }: ImportModalProps) {
     setFormat("json");
     setJsonContent("");
     setError(null);
+    setDiagnostics([]);
     onClose();
   };
 
@@ -143,7 +150,7 @@ export function ImportModal({ open, onClose, onImport }: ImportModalProps) {
               size="sm"
               onClick={() => fileInputRef.current?.click()}
             >
-              📁 Upload JSON
+              Upload File
             </Button>
           </div>
           <textarea
@@ -162,6 +169,20 @@ export function ImportModal({ open, onClose, onImport }: ImportModalProps) {
         </div>
 
         {error && <div className={styles.importError}>{error}</div>}
+        {diagnostics.length > 0 ? (
+          <div className={styles.importWarnings}>
+            {diagnostics.map((diagnostic, index) => (
+              <div
+                key={`${diagnostic.code}-${diagnostic.line ?? index}-${index}`}
+                className={styles.importWarning}
+              >
+                <strong>{diagnostic.severity}</strong>
+                {diagnostic.line ? ` line ${diagnostic.line}: ` : " "}
+                {diagnostic.message}
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         <div className={styles.importActions}>
           <Button variant="secondary" onClick={handleClose}>
@@ -185,7 +206,7 @@ function validateImportContent(
   format: "json" | "dsl" | "mermaid",
   title: string,
 ) {
-  parseImportedDocument(content, format, title || "Imported Diagram");
+  return parseImportedDocumentDetailed(content, format, title || "Imported Diagram");
 }
 
 function parseImportedDocument(
@@ -194,23 +215,23 @@ function parseImportedDocument(
   title: string,
 ): DiagramDocument {
   if (format === "dsl") {
-    return parseDslDocument(content, {
+    return parseDslDocumentDetailed(content, {
       metadata: {
         title,
         source: "native",
         tags: [],
       },
-    });
+    }).document;
   }
 
   if (format === "mermaid") {
-    return parseMermaidDocument(content, {
+    return parseMermaidDocumentDetailed(content, {
       metadata: {
         title,
         source: "mermaid",
         tags: [],
       },
-    });
+    }).document;
   }
 
   const parsed = JSON.parse(content);
@@ -229,4 +250,33 @@ function parseImportedDocument(
     title,
     data: parsed,
   });
+}
+
+function parseImportedDocumentDetailed(
+  content: string,
+  format: "json" | "dsl" | "mermaid",
+  title: string,
+) {
+  if (format === "dsl") {
+    return parseDslDocumentDetailed(content, {
+      metadata: {
+        title,
+        source: "native",
+        tags: [],
+      },
+    });
+  }
+
+  if (format === "mermaid") {
+    return parseMermaidDocumentDetailed(content, {
+      metadata: {
+        title,
+        source: "mermaid",
+        tags: [],
+      },
+    });
+  }
+
+  const document = parseImportedDocument(content, "json", title);
+  return { document, diagnostics: [] as DslDiagnostic[], degraded: false };
 }

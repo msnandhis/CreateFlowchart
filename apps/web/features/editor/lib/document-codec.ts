@@ -1,9 +1,13 @@
 import {
   documentToAst,
+  documentToMermaidWithDiagnostics,
   documentToFlowDsl,
   flowDslToDocument,
+  flowDslToDocumentWithDiagnostics,
   mermaidToDocument,
+  mermaidToDocumentWithDiagnostics,
   parseFlowDsl,
+  type DslDiagnostic,
 } from "@createflowchart/dsl";
 import type { DiagramDocument } from "@createflowchart/schema";
 
@@ -23,11 +27,22 @@ export function serializeDocumentToDsl(document: DiagramDocument): string {
   return documentToFlowDsl(document);
 }
 
+export function serializeDocumentToMermaid(document: DiagramDocument) {
+  return documentToMermaidWithDiagnostics(document);
+}
+
 export function parseDslDocument(
   source: string,
   base?: Partial<DiagramDocument>,
 ): DiagramDocument {
   return flowDslToDocument(source, base);
+}
+
+export function parseDslDocumentDetailed(
+  source: string,
+  base?: Partial<DiagramDocument>,
+): { document: DiagramDocument; diagnostics: DslDiagnostic[]; degraded: boolean } {
+  return flowDslToDocumentWithDiagnostics(source, base);
 }
 
 export function inspectDslDocument(source: string) {
@@ -43,6 +58,13 @@ export function parseMermaidDocument(
   base?: Partial<DiagramDocument>,
 ): DiagramDocument {
   return mermaidToDocument(source, base);
+}
+
+export function parseMermaidDocumentDetailed(
+  source: string,
+  base?: Partial<DiagramDocument>,
+): { document: DiagramDocument; diagnostics: DslDiagnostic[]; degraded: boolean } {
+  return mermaidToDocumentWithDiagnostics(source, base);
 }
 
 export function diffDocuments(

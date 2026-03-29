@@ -254,6 +254,22 @@
   font-size: var(--font-size-sm);
 }
 
+.importWarnings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.importWarning {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.08);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+}
+
 .importActions {
   display: flex;
   justify-content: flex-end;

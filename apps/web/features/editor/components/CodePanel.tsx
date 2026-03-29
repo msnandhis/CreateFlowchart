@@ -6,10 +6,14 @@ import { useDocument, useEditorStore } from "../stores/editorStore";
 import {
   diffDocuments,
   parseDslDocument,
+  parseDslDocumentDetailed,
   parseMermaidDocument,
+  parseMermaidDocumentDetailed,
   serializeDocumentToDsl,
+  serializeDocumentToMermaid,
 } from "../lib/document-codec";
 import styles from "../styles/code-panel.module.css";
+import type { DslDiagnostic } from "@createflowchart/dsl";
 
 type CodeMode = "dsl" | "mermaid";
 
@@ -19,39 +23,57 @@ export function CodePanel() {
   const [mode, setMode] = useState<CodeMode>("dsl");
   const [source, setSource] = useState(() => serializeDocumentToDsl(document));
   const [error, setError] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<DslDiagnostic[]>([]);
   const [isDirty, setIsDirty] = useState(false);
   const [draftSummary, setDraftSummary] = useState<ReturnType<typeof diffDocuments> | null>(null);
   const [draftDocument, setDraftDocument] = useState<typeof document | null>(null);
 
   useEffect(() => {
-    if (mode !== "dsl" || isDirty) return;
-    setSource(serializeDocumentToDsl(document));
-  }, [document, mode, isDirty]);
+    if (isDirty) return;
+
+    const nextSource =
+      mode === "dsl"
+        ? serializeDocumentToDsl(document)
+        : serializeDocumentToMermaid(document).content;
+    setSource(nextSource);
+    setDiagnostics([]);
+  }, [document, isDirty, mode]);
 
   const handleChange = (value: string) => {
     setSource(value);
     setIsDirty(true);
-    if (mode !== "dsl") {
-      setDraftSummary(null);
-      setDraftDocument(null);
-      return;
-    }
 
     try {
-      const nextDocument = parseDslDocument(value, {
-        id: document.id,
-        metadata: document.metadata,
-        theme: document.theme,
-        layout: document.layout,
-        annotations: document.annotations,
-      });
-      setDraftDocument(nextDocument);
-      setDraftSummary(diffDocuments(document, nextDocument));
+      const parsed =
+        mode === "dsl"
+          ? parseDslDocumentDetailed(value, {
+              id: document.id,
+              metadata: document.metadata,
+              theme: document.theme,
+              layout: document.layout,
+              annotations: document.annotations,
+            })
+          : parseMermaidDocumentDetailed(value, {
+              id: document.id,
+              metadata: {
+                ...document.metadata,
+                title: document.metadata.title,
+                source: "mermaid",
+              },
+              theme: document.theme,
+              layout: document.layout,
+              annotations: document.annotations,
+            });
+
+      setDraftDocument(parsed.document);
+      setDraftSummary(diffDocuments(document, parsed.document));
+      setDiagnostics(parsed.diagnostics);
       setError(null);
     } catch (err) {
       setDraftDocument(null);
       setDraftSummary(null);
-      setError(err instanceof Error ? err.message : "Failed to parse DSL");
+      setDiagnostics([]);
+      setError(err instanceof Error ? err.message : "Failed to parse source");
     }
   };
 
@@ -79,13 +101,18 @@ export function CodePanel() {
             });
 
       setDocument(nextDocument);
-      setSource(serializeDocumentToDsl(nextDocument));
+      setSource(
+        mode === "dsl"
+          ? serializeDocumentToDsl(nextDocument)
+          : serializeDocumentToMermaid(nextDocument).content,
+      );
       setError(null);
+      setDiagnostics([]);
       setIsDirty(false);
       setDraftDocument(null);
       setDraftSummary(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Import failed");
+      setError(err instanceof Error ? err.message : "Apply failed");
     }
   };
 
@@ -93,9 +120,10 @@ export function CodePanel() {
     setSource(
       mode === "dsl"
         ? serializeDocumentToDsl(document)
-        : `flowchart TD\n    start["${document.metadata.title}"]`,
+        : serializeDocumentToMermaid(document).content,
     );
     setError(null);
+    setDiagnostics([]);
     setIsDirty(false);
     setDraftDocument(null);
     setDraftSummary(null);
@@ -112,6 +140,7 @@ export function CodePanel() {
               setMode("dsl");
               setSource(serializeDocumentToDsl(document));
               setError(null);
+              setDiagnostics([]);
               setIsDirty(false);
             }}
           >
@@ -122,12 +151,13 @@ export function CodePanel() {
             className={`${styles.modeButton} ${mode === "mermaid" ? styles.active : ""}`}
             onClick={() => {
               setMode("mermaid");
-              setSource(`flowchart TD\n    start["${document.metadata.title}"]`);
+              setSource(serializeDocumentToMermaid(document).content);
               setError(null);
+              setDiagnostics([]);
               setIsDirty(false);
             }}
           >
-            Mermaid Import
+            Mermaid
           </button>
         </div>
         <div className={styles.actions}>
@@ -135,7 +165,7 @@ export function CodePanel() {
             Reset
           </Button>
           <Button variant="secondary" size="sm" onClick={applyCurrentSource}>
-            {mode === "dsl" ? "Apply" : "Import"}
+            Apply
           </Button>
         </div>
       </div>
@@ -152,10 +182,10 @@ export function CodePanel() {
       <div className={styles.footer}>
         <span className={styles.hint}>
           {mode === "dsl"
-            ? "Canvas changes sync into DSL live. DSL edits produce a draft diff before apply."
-            : "Paste Mermaid flowchart syntax and import it into the canonical document model."}
+            ? `Native DSL v${"1.0"} is the canonical code surface. Edits are validated before apply.`
+            : "Mermaid mode is a compatibility view. Unsupported constructs are reported instead of silently dropped."}
         </span>
-        {mode === "dsl" && draftSummary ? (
+        {draftSummary ? (
           <div className={styles.diffBox}>
             <div className={styles.diffGrid}>
               <span>+{draftSummary.nodesAdded} nodes</span>
@@ -174,6 +204,20 @@ export function CodePanel() {
                 ))}
               </div>
             ) : null}
+          </div>
+        ) : null}
+        {diagnostics.length > 0 ? (
+          <div className={styles.diagnostics}>
+            {diagnostics.map((diagnostic, index) => (
+              <div
+                key={`${diagnostic.code}-${diagnostic.line ?? index}-${index}`}
+                className={`${styles.diagnosticItem} ${styles[`diagnostic${diagnostic.severity[0].toUpperCase()}${diagnostic.severity.slice(1)}`]}`}
+              >
+                <strong>{diagnostic.severity}</strong>
+                {diagnostic.line ? ` line ${diagnostic.line}: ` : " "}
+                {diagnostic.message}
+              </div>
+            ))}
           </div>
         ) : null}
         {error ? <span className={styles.error}>{error}</span> : null}

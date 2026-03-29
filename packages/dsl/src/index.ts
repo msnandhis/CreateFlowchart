@@ -16,6 +16,54 @@ export interface DiagramDslAst {
   containers: DiagramContainer[];
 }
 
+export const NATIVE_DSL_VERSION = "1.0";
+
+export interface DslDiagnostic {
+  source: "dsl" | "mermaid" | "export";
+  severity: "error" | "warning" | "info";
+  code: string;
+  message: string;
+  line?: number;
+  raw?: string;
+}
+
+export interface DiagramDslParseResult {
+  ast: DiagramDslAst | null;
+  diagnostics: DslDiagnostic[];
+  degraded: boolean;
+}
+
+export interface DiagramDslDocumentResult {
+  document: DiagramDocument;
+  diagnostics: DslDiagnostic[];
+  degraded: boolean;
+}
+
+export interface DiagramDslExportResult {
+  content: string;
+  diagnostics: DslDiagnostic[];
+  degraded: boolean;
+}
+
+export const MERMAID_COMPATIBILITY_MATRIX = {
+  flowchart: {
+    supported: ["nodes", "subgraphs", "default flows", "conditional labels", "message-style connectors"],
+    degraded: ["ports", "node styling", "multiple edge labels", "manual routing", "annotations"],
+  },
+  sequence: {
+    supported: ["participants", "messages", "return messages"],
+    degraded: ["activation bars", "notes", "alt/opt/par blocks"],
+  },
+  state: {
+    supported: ["states", "nested states", "terminal transitions", "labeled transitions"],
+    degraded: ["composite state internals beyond nested blocks", "styling", "parallel states"],
+  },
+  bpmn: {
+    supported: ["tasks", "gateways", "subprocesses", "pools and lanes via subgraphs", "message flow inference"],
+    degraded: ["full BPMN event taxonomy", "boundary events", "data objects", "marker fidelity"],
+  },
+} as const;
+
 export function documentToAst(document: DiagramDocument): DiagramDslAst {
   return {
     family: document.family,
@@ -55,30 +103,94 @@ export function astToDocument(
 }
 
 export function documentToFlowDsl(document: DiagramDocument): string {
-  return printFlowDsl(documentToAst(document));
+  return documentToFlowDslWithDiagnostics(document).content;
 }
 
 export function flowDslToDocument(
   source: string,
   base?: Partial<DiagramDocument>,
 ): DiagramDocument {
-  return astToDocument(parseFlowDsl(source), base);
+  return flowDslToDocumentWithDiagnostics(source, base).document;
 }
 
 export function mermaidToDocument(
   source: string,
   base?: Partial<DiagramDocument>,
 ): DiagramDocument {
-  return astToDocument(parseMermaid(source), base);
+  return mermaidToDocumentWithDiagnostics(source, base).document;
 }
 
 export function documentToMermaid(document: DiagramDocument): string {
+  return documentToMermaidWithDiagnostics(document).content;
+}
+
+export function documentToFlowDslWithDiagnostics(
+  document: DiagramDocument,
+): DiagramDslExportResult {
+  const diagnostics = collectDslExportDiagnostics(document);
+  return {
+    content: printFlowDsl(documentToAst(document)),
+    diagnostics,
+    degraded: diagnostics.some((diagnostic) => diagnostic.severity !== "info"),
+  };
+}
+
+export function flowDslToDocumentWithDiagnostics(
+  source: string,
+  base?: Partial<DiagramDocument>,
+): DiagramDslDocumentResult {
+  const parsed = parseFlowDslWithDiagnostics(source);
+  if (!parsed.ast) {
+    throw formatDiagnosticsError(parsed.diagnostics, "Native DSL parse failed");
+  }
+
+  return {
+    document: astToDocument(parsed.ast, base),
+    diagnostics: parsed.diagnostics,
+    degraded: parsed.degraded,
+  };
+}
+
+export function mermaidToDocumentWithDiagnostics(
+  source: string,
+  base?: Partial<DiagramDocument>,
+): DiagramDslDocumentResult {
+  const parsed = parseMermaidWithDiagnostics(source);
+  if (!parsed.ast) {
+    throw formatDiagnosticsError(parsed.diagnostics, "Mermaid parse failed");
+  }
+
+  return {
+    document: astToDocument(parsed.ast, base),
+    diagnostics: parsed.diagnostics,
+    degraded: parsed.degraded,
+  };
+}
+
+export function documentToMermaidWithDiagnostics(
+  document: DiagramDocument,
+): DiagramDslExportResult {
+  const diagnostics = collectMermaidExportDiagnostics(document);
+  const comments = diagnostics
+    .filter((diagnostic) => diagnostic.severity !== "info")
+    .map((diagnostic) => `%% ${diagnostic.code}: ${diagnostic.message}`);
+
   if (document.family === "sequence") {
-    return documentToMermaidSequence(document);
+    const content = documentToMermaidSequence(document);
+    return {
+      content: comments.length > 0 ? `${comments.join("\n")}\n${content}` : content,
+      diagnostics,
+      degraded: comments.length > 0,
+    };
   }
 
   if (document.family === "state") {
-    return documentToMermaidState(document);
+    const content = documentToMermaidState(document);
+    return {
+      content: comments.length > 0 ? `${comments.join("\n")}\n${content}` : content,
+      diagnostics,
+      degraded: comments.length > 0,
+    };
   }
 
   const lines: string[] = ["flowchart TD"];
@@ -168,10 +280,19 @@ export function documentToMermaid(document: DiagramDocument): string {
     );
   }
 
-  return lines.join("\n");
+  const content = lines.join("\n");
+  return {
+    content: comments.length > 0 ? `${comments.join("\n")}\n${content}` : content,
+    diagnostics,
+    degraded: comments.length > 0,
+  };
 }
 
 export function parseMermaid(source: string): DiagramDslAst {
+  return requireAst(parseMermaidWithDiagnostics(source), "Mermaid parse failed");
+}
+
+export function parseMermaidWithDiagnostics(source: string): DiagramDslParseResult {
   const trimmed = source.trim();
   if (/^sequenceDiagram\b/i.test(trimmed)) {
     return parseMermaidSequence(trimmed);
@@ -267,6 +388,10 @@ export function printFlowDsl(ast: DiagramDslAst): string {
 }
 
 export function parseFlowDsl(source: string): DiagramDslAst {
+  return requireAst(parseFlowDslWithDiagnostics(source), "Native DSL parse failed");
+}
+
+export function parseFlowDslWithDiagnostics(source: string): DiagramDslParseResult {
   const lines = source
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -280,8 +405,9 @@ export function parseFlowDsl(source: string): DiagramDslAst {
   const edges: DiagramEdge[] = [];
   const containers: DiagramContainer[] = [];
   const automationByNodeId = new Map<string, DiagramNode["automation"]>();
+  const diagnostics: DslDiagnostic[] = [];
 
-  for (const line of lines) {
+  for (const [index, line] of lines.entries()) {
     const tokens = tokenize(line);
     const [command, ...rest] = tokens;
 
@@ -403,7 +529,17 @@ export function parseFlowDsl(source: string): DiagramDslAst {
         style: { tokens: {} },
         metadata: {},
       });
+      continue;
     }
+
+    diagnostics.push({
+      source: "dsl",
+      severity: "error",
+      code: "unsupported-dsl-command",
+      message: `Unsupported DSL command "${command}"`,
+      line: index + 1,
+      raw: line,
+    });
   }
 
   const resolvedNodes = nodes.map((node) => ({
@@ -411,7 +547,7 @@ export function parseFlowDsl(source: string): DiagramDslAst {
     automation: automationByNodeId.get(node.id) ?? node.automation,
   }));
 
-  return {
+  const ast = {
     family,
     kit,
     title,
@@ -420,9 +556,17 @@ export function parseFlowDsl(source: string): DiagramDslAst {
     edges,
     containers,
   };
+
+  return {
+    ast: diagnostics.some((diagnostic) => diagnostic.severity === "error")
+      ? null
+      : ast,
+    diagnostics,
+    degraded: diagnostics.some((diagnostic) => diagnostic.severity !== "info"),
+  };
 }
 
-export function parseMermaidFlowchart(source: string): DiagramDslAst {
+export function parseMermaidFlowchart(source: string): DiagramDslParseResult {
   const lines = source
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -438,6 +582,7 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
   const laneOffsets = new Map<string, number>();
   const nodeToContainer = new Map<string, string>();
   const childContainerAssignments = new Map<string, Set<string>>();
+  const diagnostics: DslDiagnostic[] = [];
   let inferredFamily: DiagramDocument["family"] = "flowchart";
   let inferredKit = "core-flowchart";
 
@@ -608,11 +753,31 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
         style: { tokens: {} },
         metadata: {},
       });
+      if (connector === "==>") {
+        diagnostics.push({
+          source: "mermaid",
+          severity: "warning",
+          code: "mermaid-conditional-flow",
+          message: `Conditional connector "${connector}" is normalized to edge kind "${edgeLabel ? "conditional-flow" : "flow"}"`,
+          raw: line,
+        });
+      }
       continue;
     }
 
     const nodeId = extractNodeId(line);
-    ensureNode(nodeId, line);
+    if (nodeId) {
+      ensureNode(nodeId, line);
+      continue;
+    }
+
+    diagnostics.push({
+      source: "mermaid",
+      severity: "warning",
+      code: "unsupported-mermaid-line",
+      message: "Unsupported Mermaid flowchart statement was skipped",
+      raw: line,
+    });
   }
 
   for (const [containerId, childContainerIds] of childContainerAssignments.entries()) {
@@ -654,16 +819,20 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
   });
 
   return {
-    family: inferredFamily,
-    kit: inferredKit,
-    title: "Imported Mermaid Diagram",
-    nodes: normalizedNodes,
-    edges,
-    containers: Array.from(containers.values()),
+    ast: {
+      family: inferredFamily,
+      kit: inferredKit,
+      title: "Imported Mermaid Diagram",
+      nodes: normalizedNodes,
+      edges,
+      containers: Array.from(containers.values()),
+    },
+    diagnostics,
+    degraded: diagnostics.some((diagnostic) => diagnostic.severity !== "info"),
   };
 }
 
-export function parseMermaidSequence(source: string): DiagramDslAst {
+export function parseMermaidSequence(source: string): DiagramDslParseResult {
   const lines = source
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -671,6 +840,7 @@ export function parseMermaidSequence(source: string): DiagramDslAst {
 
   const participants = new Map<string, DiagramNode>();
   const edges: DiagramEdge[] = [];
+  const diagnostics: DslDiagnostic[] = [];
 
   const ensureParticipant = (id: string, label?: string) => {
     if (participants.has(id)) {
@@ -732,20 +902,33 @@ export function parseMermaidSequence(source: string): DiagramDslAst {
         style: { tokens: {} },
         metadata: {},
       });
+      continue;
     }
+
+    diagnostics.push({
+      source: "mermaid",
+      severity: "warning",
+      code: "unsupported-sequence-line",
+      message: "Unsupported Mermaid sequence statement was skipped",
+      raw: line,
+    });
   }
 
   return {
-    family: "sequence",
-    kit: "sequence-core",
-    title: "Imported Mermaid Sequence",
-    nodes: Array.from(participants.values()),
-    edges,
-    containers: [],
+    ast: {
+      family: "sequence",
+      kit: "sequence-core",
+      title: "Imported Mermaid Sequence",
+      nodes: Array.from(participants.values()),
+      edges,
+      containers: [],
+    },
+    diagnostics,
+    degraded: diagnostics.some((diagnostic) => diagnostic.severity !== "info"),
   };
 }
 
-export function parseMermaidState(source: string): DiagramDslAst {
+export function parseMermaidState(source: string): DiagramDslParseResult {
   const lines = source
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -755,6 +938,7 @@ export function parseMermaidState(source: string): DiagramDslAst {
   const edges: DiagramEdge[] = [];
   const containers = new Map<string, DiagramContainer>();
   const containerStack: string[] = [];
+  const diagnostics: DslDiagnostic[] = [];
 
   const ensureState = (id: string) => {
     const normalizedId = id === "[*]" ? `state_${nodes.size + 1}` : id;
@@ -845,6 +1029,13 @@ export function parseMermaidState(source: string): DiagramDslAst {
 
     const transitionMatch = line.match(/^(.+?)\s*-->\s*(.+?)(?:\s*:\s*(.+))?$/);
     if (!transitionMatch) {
+      diagnostics.push({
+        source: "mermaid",
+        severity: "warning",
+        code: "unsupported-state-line",
+        message: "Unsupported Mermaid state statement was skipped",
+        raw: line,
+      });
       continue;
     }
 
@@ -871,12 +1062,16 @@ export function parseMermaidState(source: string): DiagramDslAst {
   }
 
   return {
-    family: "state",
-    kit: "state-core",
-    title: "Imported Mermaid State Diagram",
-    nodes: Array.from(nodes.values()),
-    edges,
-    containers: Array.from(containers.values()),
+    ast: {
+      family: "state",
+      kit: "state-core",
+      title: "Imported Mermaid State Diagram",
+      nodes: Array.from(nodes.values()),
+      edges,
+      containers: Array.from(containers.values()),
+    },
+    diagnostics,
+    degraded: diagnostics.some((diagnostic) => diagnostic.severity !== "info"),
   };
 }
 
@@ -1139,4 +1334,125 @@ function documentToMermaidState(document: DiagramDocument): string {
 
 function escapeMermaidText(value: string): string {
   return value.replace(/"/g, "'").trim();
+}
+
+function requireAst(
+  result: DiagramDslParseResult,
+  fallbackMessage: string,
+): DiagramDslAst {
+  if (result.ast) {
+    return result.ast;
+  }
+
+  throw formatDiagnosticsError(result.diagnostics, fallbackMessage);
+}
+
+function formatDiagnosticsError(
+  diagnostics: DslDiagnostic[],
+  fallbackMessage: string,
+): Error {
+  const first = diagnostics.find((diagnostic) => diagnostic.severity === "error");
+  if (!first) {
+    return new Error(fallbackMessage);
+  }
+
+  const prefix = first.line ? `line ${first.line}: ` : "";
+  return new Error(`${prefix}${first.message}`);
+}
+
+function collectDslExportDiagnostics(document: DiagramDocument): DslDiagnostic[] {
+  const diagnostics: DslDiagnostic[] = [];
+
+  if (document.annotations.length > 0) {
+    diagnostics.push({
+      source: "export",
+      severity: "warning",
+      code: "dsl-annotations-omitted",
+      message: "Annotations are not emitted in native DSL v1 and remain document-only metadata.",
+    });
+  }
+
+  return diagnostics;
+}
+
+function collectMermaidExportDiagnostics(document: DiagramDocument): DslDiagnostic[] {
+  const diagnostics: DslDiagnostic[] = [];
+
+  if (!["flowchart", "bpmn", "sequence", "state"].includes(document.family)) {
+    diagnostics.push({
+      source: "export",
+      severity: "warning",
+      code: "mermaid-family-fallback",
+      message: `Diagram family "${document.family}" is exported through the flowchart compatibility view.`,
+    });
+  }
+
+  if (document.annotations.length > 0) {
+    diagnostics.push({
+      source: "export",
+      severity: "warning",
+      code: "mermaid-annotations-omitted",
+      message: "Annotations are omitted because Mermaid does not map them directly in this export path.",
+    });
+  }
+
+  for (const node of document.nodes) {
+    if (node.ports.length > 0) {
+      diagnostics.push({
+        source: "export",
+        severity: "info",
+        code: "mermaid-ports-omitted",
+        message: `Ports on node "${node.id}" are not emitted explicitly in Mermaid.`,
+      });
+      break;
+    }
+  }
+
+  for (const edge of document.edges) {
+    if (edge.labels.length > 1) {
+      diagnostics.push({
+        source: "export",
+        severity: "warning",
+        code: "mermaid-multi-label-edge",
+        message: `Edge "${edge.id}" has multiple labels; only the first Mermaid-compatible label is exported.`,
+      });
+      break;
+    }
+
+    if (edge.routing === "manual" || edge.routing === "bezier") {
+      diagnostics.push({
+        source: "export",
+        severity: "warning",
+        code: "mermaid-routing-normalized",
+        message: `Edge "${edge.id}" uses "${edge.routing}" routing; Mermaid export normalizes it to a supported connector.`,
+      });
+      break;
+    }
+  }
+
+  for (const container of document.containers) {
+    if (!["group", "pool", "lane"].includes(container.type)) {
+      diagnostics.push({
+        source: "export",
+        severity: "warning",
+        code: "mermaid-container-normalized",
+        message: `Container "${container.id}" of type "${container.type}" is exported as a Mermaid subgraph.`,
+      });
+      break;
+    }
+  }
+
+  for (const node of document.nodes) {
+    if (node.style.fill || node.style.stroke || node.style.textColor) {
+      diagnostics.push({
+        source: "export",
+        severity: "info",
+        code: "mermaid-style-omitted",
+        message: `Custom styling on node "${node.id}" is not preserved in Mermaid export.`,
+      });
+      break;
+    }
+  }
+
+  return diagnostics;
 }

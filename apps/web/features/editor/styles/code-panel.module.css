@@ -116,3 +116,33 @@
   color: var(--color-danger, #f87171);
   font-size: var(--font-size-xs);
 }
+
+.diagnostics {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diagnosticItem {
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+  border: 1px solid var(--color-border);
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.diagnosticError {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.diagnosticWarning {
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.diagnosticInfo {
+  border-color: rgba(59, 130, 246, 0.35);
+  background: rgba(59, 130, 246, 0.08);
+}
