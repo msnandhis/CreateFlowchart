@@ -38,6 +38,15 @@ export interface AIExplainResult {
   }>;
 }
 
+export interface JobProgressEvent {
+  jobId: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  progress: number;
+  result?: unknown;
+  error?: string;
+  timestamp: string;
+}
+
 type StatusListener = (status: AIJobStatus) => void;
 
 class AIServiceError extends Error {
@@ -55,6 +64,7 @@ class AIService {
   private statusListeners: Map<string, StatusListener[]> = new Map();
   private pollingIntervals: Map<string, ReturnType<typeof setInterval>> =
     new Map();
+  private sseConnections: Map<string, EventSource> = new Map();
 
   private async fetchWithAuth(
     path: string,
@@ -68,6 +78,55 @@ class AIService {
       },
     });
     return response;
+  }
+
+  subscribeToJobSSE(jobId: string, onStatus: StatusListener): () => void {
+    this.closeSSEConnection(jobId);
+
+    const eventSource = new EventSource(`/api/ai/stream/${jobId}`);
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as JobProgressEvent;
+        const status: AIJobStatus = {
+          id: data.jobId,
+          status: data.status,
+          progress: data.progress,
+          result: data.result,
+          error: data.error,
+        };
+        this.setJobStatus(jobId, status);
+        onStatus(status);
+
+        if (data.status === "completed" || data.status === "failed") {
+          this.closeSSEConnection(jobId);
+        }
+      } catch (err) {
+        console.error(`[AIService] SSE parse error for job ${jobId}:`, err);
+      }
+    };
+
+    eventSource.onerror = () => {
+      console.error(`[AIService] SSE error for job ${jobId}`);
+      this.closeSSEConnection(jobId);
+      setTimeout(() => {
+        this.startPolling(jobId, onStatus);
+      }, 2000);
+    };
+
+    this.sseConnections.set(jobId, eventSource);
+
+    return () => {
+      this.closeSSEConnection(jobId);
+    };
+  }
+
+  closeSSEConnection(jobId: string): void {
+    const eventSource = this.sseConnections.get(jobId);
+    if (eventSource) {
+      eventSource.close();
+      this.sseConnections.delete(jobId);
+    }
   }
 
   async generate(input: AIGenerateInput): Promise<{ jobId: string }> {
@@ -217,7 +276,20 @@ class AIService {
   async waitForCompletion(
     jobId: string,
     onStatus: StatusListener,
+    useSSE: boolean = true,
   ): Promise<AIJobStatus> {
+    if (useSSE) {
+      return new Promise((resolve) => {
+        const unsubscribe = this.subscribeToJobSSE(jobId, (status) => {
+          onStatus(status);
+          if (status.status === "completed" || status.status === "failed") {
+            unsubscribe();
+            resolve(status);
+          }
+        });
+      });
+    }
+
     return new Promise((resolve) => {
       this.subscribe(jobId, (status) => {
         onStatus(status);
@@ -233,6 +305,8 @@ class AIService {
     this.pollingIntervals.forEach((interval) => clearInterval(interval));
     this.pollingIntervals.clear();
     this.statusListeners.clear();
+    this.sseConnections.forEach((es) => es.close());
+    this.sseConnections.clear();
   }
 }
 

@@ -18,10 +18,15 @@ import type { WebsocketProvider } from "y-websocket";
 import { PresenceLayer } from "./PresenceLayer";
 import { useMemo } from "react";
 
-export function Canvas({ provider }: { provider: WebsocketProvider | null }) {
+interface CanvasProps {
+  provider: WebsocketProvider | null;
+  updateLocalCursor?: (x: number, y: number) => void;
+}
+
+export function Canvas({ provider, updateLocalCursor }: CanvasProps) {
   const nodes = useNodes();
   const edges = useEdges();
-  
+
   const onNodesChange = useEditorStore((s) => s.onNodesChange);
   const onEdgesChange = useEditorStore((s) => s.onEdgesChange);
   const onConnect = useEditorStore((s) => s.onConnect);
@@ -36,23 +41,14 @@ export function Canvas({ provider }: { provider: WebsocketProvider | null }) {
     setSelectedEdge(null);
   };
 
-  /**
-   * Track local mouse movement and broadcast to other users via Yjs awareness.
-   */
   const handlePointerMove = (event: React.PointerEvent) => {
-    if (!provider) return;
-    
-    // We update the awareness state with the local cursor position
+    if (!updateLocalCursor) return;
+
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    provider.awareness.setLocalStateField("cursor", {
-      x,
-      y,
-      name: "User", // TODO: Get from session
-      color: "#3b82f6", // TODO: Assign random per user
-    });
+    updateLocalCursor(x, y);
   };
 
   return (
@@ -78,7 +74,12 @@ export function Canvas({ provider }: { provider: WebsocketProvider | null }) {
         }}
         proOptions={{ hideAttribution: true }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--color-border)" />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={20}
+          size={1}
+          color="var(--color-border)"
+        />
         <Controls showInteractive={false} />
         <MiniMap
           nodeStrokeWidth={2}
@@ -91,4 +92,3 @@ export function Canvas({ provider }: { provider: WebsocketProvider | null }) {
     </div>
   );
 }
-

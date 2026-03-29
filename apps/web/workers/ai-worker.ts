@@ -5,6 +5,10 @@ import type { AIGenerationJobData } from "../shared/lib/queue";
 import { redis } from "../shared/lib/redis";
 import { aiPipeline } from "../shared/lib/ai-gateway";
 import {
+  publishJobEvent,
+  type JobProgressEvent,
+} from "../shared/lib/job-events";
+import {
   SYSTEM_PROMPT,
   buildGeneratePrompt,
   ANALYZE_SYSTEM_PROMPT,
@@ -166,13 +170,32 @@ export function attemptAutoRepair(data: unknown): FlowGraph | null {
   return validateFlowGraphResponse(repaired);
 }
 
+async function emitProgress(
+  jobId: string,
+  status: JobProgressEvent["status"],
+  progress: number,
+  extra?: Partial<JobProgressEvent>,
+): Promise<void> {
+  const event: JobProgressEvent = {
+    jobId,
+    status,
+    progress,
+    timestamp: new Date().toISOString(),
+    ...extra,
+  };
+  await publishJobEvent(jobId, event);
+}
+
 export async function processAIJob(
   job: Job<AIGenerationJobData>,
 ): Promise<AIJobResult> {
   const { userId, prompt, action, flowId, existingFlowGraph } = job.data;
   const startedAt = new Date().toISOString();
+  const jobId = job.id || "unknown";
 
   console.log(`[AIWorker] Processing ${action} job for user ${userId}`);
+
+  await emitProgress(jobId, "processing", 10);
 
   try {
     const sanitizedPrompt = sanitizePrompt(prompt);
@@ -180,30 +203,36 @@ export async function processAIJob(
 
     switch (action) {
       case "generate":
-        result = await handleGenerate(userId, sanitizedPrompt, job.id!);
+        await emitProgress(jobId, "processing", 20);
+        result = await handleGenerate(userId, sanitizedPrompt, jobId);
         break;
       case "analyze":
+        await emitProgress(jobId, "processing", 20);
         result = await handleAnalyze(
           userId,
           sanitizedPrompt,
           existingFlowGraph,
-          job.id!,
+          jobId,
         );
         break;
       case "improve":
+        await emitProgress(jobId, "processing", 20);
         result = await handleImprove(
           userId,
           sanitizedPrompt,
           existingFlowGraph,
-          job.id!,
+          jobId,
         );
         break;
       case "explain":
-        result = await handleExplain(userId, existingFlowGraph, job.id!);
+        await emitProgress(jobId, "processing", 20);
+        result = await handleExplain(userId, existingFlowGraph, jobId);
         break;
       default:
         throw new Error(`Unknown action: ${action}`);
     }
+
+    await emitProgress(jobId, "processing", 90);
 
     result.startedAt = startedAt;
     result.completedAt = new Date().toISOString();
@@ -211,18 +240,22 @@ export async function processAIJob(
       new Date(result.completedAt).getTime() - new Date(startedAt).getTime();
 
     await job.updateProgress(100);
+    await emitProgress(jobId, "completed", 100, { result });
+
     return result;
   } catch (error) {
     console.error(`[AIWorker] Job failed:`, error);
-    return {
+    const errorResult = {
       success: false,
       error: String(error),
-      jobId: job.id!,
+      jobId,
       action,
       startedAt,
       completedAt: new Date().toISOString(),
       duration: 0,
     };
+    await emitProgress(jobId, "failed", 0, { error: String(error) });
+    return errorResult;
   }
 }
 
@@ -454,18 +487,28 @@ export function createAIGatewayWorker() {
     },
   );
 
-  worker.on("completed", (job: Job | undefined) => {
+  worker.on("completed", async (job: Job | undefined) => {
     console.log(`[AIWorker] Job ${job?.id} completed`);
+    if (job?.id) {
+      await emitProgress(job.id, "completed", 100);
+    }
   });
 
-  worker.on("failed", (job: Job | undefined, err: Error) => {
+  worker.on("failed", async (job: Job | undefined, err: Error) => {
     console.error(`[AIWorker] Job ${job?.id} failed:`, err);
+    if (job?.id) {
+      await emitProgress(job.id, "failed", 0, { error: err.message });
+    }
   });
 
-  worker.on("progress", (job: Job, progress: number | object) => {
+  worker.on("progress", async (job: Job, progress: number | object) => {
     console.log(
       `[AIWorker] Job ${job.id} progress: ${JSON.stringify(progress)}`,
     );
+    if (job.id) {
+      const progressNum = typeof progress === "number" ? progress : 0;
+      await emitProgress(job.id, "processing", progressNum);
+    }
   });
 
   return worker;

@@ -22,8 +22,12 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   emailVerified: boolean("email_verified").default(false).notNull(),
   image: text("image"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 export const sessions = pgTable("sessions", {
@@ -35,8 +39,12 @@ export const sessions = pgTable("sessions", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 export const accounts = pgTable("accounts", {
@@ -48,13 +56,21 @@ export const accounts = pgTable("accounts", {
   providerId: text("provider_id").notNull(),
   accessToken: text("access_token"),
   refreshToken: text("refresh_token"),
-  accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
-  refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true }),
+  accessTokenExpiresAt: timestamp("access_token_expires_at", {
+    withTimezone: true,
+  }),
+  refreshTokenExpiresAt: timestamp("refresh_token_expires_at", {
+    withTimezone: true,
+  }),
   scope: text("scope"),
   idToken: text("id_token"),
   password: text("password"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 export const verifications = pgTable("verifications", {
@@ -62,8 +78,12 @@ export const verifications = pgTable("verifications", {
   identifier: text("identifier").notNull(),
   value: text("value").notNull(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -82,14 +102,18 @@ export const flows = pgTable(
     isPublic: boolean("is_public").default(false).notNull(),
     isFeatured: boolean("is_featured").default(false).notNull(),
     likeCount: integer("like_count").default(0).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
     index("flows_user_id_idx").on(table.userId),
     index("flows_is_public_idx").on(table.isPublic),
     index("flows_updated_at_idx").on(table.updatedAt),
-  ]
+  ],
 );
 
 export const flowVersions = pgTable(
@@ -102,15 +126,84 @@ export const flowVersions = pgTable(
     data: jsonb("data").notNull(), // FlowGraph snapshot
     changeSummary: text("change_summary"),
     versionNumber: integer("version_number").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
   },
   (table) => [
     index("flow_versions_flow_id_idx").on(table.flowId),
     uniqueIndex("flow_versions_flow_version_idx").on(
       table.flowId,
-      table.versionNumber
+      table.versionNumber,
     ),
-  ]
+  ],
+);
+
+export const templates = pgTable(
+  "templates",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    data: jsonb("data").notNull(), // FlowGraph JSON
+    category: text("category").default("general"),
+    tags: text("tags").array().default([]),
+    usageCount: integer("usage_count").default(0).notNull(),
+    likeCount: integer("like_count").default(0).notNull(),
+    isFeatured: boolean("is_featured").default(false).notNull(),
+    isPublic: boolean("is_public").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    index("templates_user_id_idx").on(table.userId),
+    index("templates_category_idx").on(table.category),
+    index("templates_is_featured_idx").on(table.isFeatured),
+    index("templates_usage_count_idx").on(table.usageCount),
+  ],
+);
+
+export const templateLikes = pgTable(
+  "template_likes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    templateId: uuid("template_id")
+      .notNull()
+      .references(() => templates.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex("template_likes_unique").on(table.templateId, table.userId),
+  ],
+);
+
+export const flowLikes = pgTable(
+  "flow_likes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    flowId: uuid("flow_id")
+      .notNull()
+      .references(() => flows.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => [uniqueIndex("flow_likes_unique").on(table.flowId, table.userId)],
 );
 
 // ─── Type exports ──────────────────────────────────────────────────
@@ -120,3 +213,9 @@ export type Flow = typeof flows.$inferSelect;
 export type NewFlow = typeof flows.$inferInsert;
 export type FlowVersion = typeof flowVersions.$inferSelect;
 export type NewFlowVersion = typeof flowVersions.$inferInsert;
+export type Template = typeof templates.$inferSelect;
+export type NewTemplate = typeof templates.$inferInsert;
+export type TemplateLike = typeof templateLikes.$inferSelect;
+export type NewTemplateLike = typeof templateLikes.$inferInsert;
+export type FlowLike = typeof flowLikes.$inferSelect;
+export type NewFlowLike = typeof flowLikes.$inferInsert;

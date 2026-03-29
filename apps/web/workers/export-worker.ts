@@ -5,15 +5,21 @@ import { db } from "../shared/lib/db";
 import { flows } from "@createflowchart/db/src/schema";
 import { eq } from "drizzle-orm";
 import type { FlowGraph } from "@createflowchart/core";
-import { toMermaid } from "@createflowchart/core";
-
-export type ExportFormat = "png" | "svg" | "pdf" | "mermaid" | "json";
+import {
+  exportAsJSON,
+  exportAsMermaid,
+  exportAsSVG,
+  exportAsPNGData,
+  exportAsPDFData,
+  type ExportFormat,
+} from "../shared/lib/export-renderer";
 
 export async function processExportJob(job: Job<ExportRenderJobData>): Promise<{
   success: boolean;
   downloadUrl?: string;
   format: ExportFormat;
   fileSize?: number;
+  svgContent?: string;
 }> {
   const { flowId, format, userId } = job.data;
 
@@ -39,27 +45,81 @@ export async function processExportJob(job: Job<ExportRenderJobData>): Promise<{
 
     let result: {
       success: boolean;
-      downloadUrl: string;
+      downloadUrl?: string;
       format: ExportFormat;
       fileSize?: number;
+      svgContent?: string;
     };
 
     switch (format) {
-      case "json":
-        result = await exportAsJSON(flowGraph, flowId);
+      case "json": {
+        const jsonResult = exportAsJSON(flowGraph);
+        if (!jsonResult.content) throw new Error("Failed to generate JSON");
+        const key = `export:${flowId}:${Date.now()}.json`;
+        await redis.set(key, jsonResult.content, "EX", 3600);
+        result = {
+          success: true,
+          downloadUrl: `/api/export/download?key=${key}`,
+          format: "json",
+          fileSize: jsonResult.fileSize,
+        };
         break;
-      case "mermaid":
-        result = await exportAsMermaid(flowGraph, flowId);
+      }
+      case "mermaid": {
+        const mermaidResult = exportAsMermaid(flowGraph);
+        if (!mermaidResult.content)
+          throw new Error("Failed to generate Mermaid");
+        const key = `export:${flowId}:${Date.now()}.mmd`;
+        await redis.set(key, mermaidResult.content, "EX", 3600);
+        result = {
+          success: true,
+          downloadUrl: `/api/export/download?key=${key}`,
+          format: "mermaid",
+          fileSize: mermaidResult.fileSize,
+        };
         break;
-      case "png":
-        result = await exportAsPNG(flowGraph, flowId);
+      }
+      case "svg": {
+        const svgResult = exportAsSVG(flowGraph);
+        if (!svgResult.content) throw new Error("Failed to generate SVG");
+        const key = `export:${flowId}:${Date.now()}.svg`;
+        await redis.set(key, svgResult.content, "EX", 3600);
+        result = {
+          success: true,
+          downloadUrl: `/api/export/download?key=${key}`,
+          format: "svg",
+          fileSize: svgResult.fileSize,
+        };
         break;
-      case "svg":
-        result = await exportAsSVG(flowGraph, flowId);
+      }
+      case "png": {
+        const svgResult = exportAsPNGData(flowGraph);
+        if (!svgResult.content) throw new Error("Failed to generate PNG data");
+        const key = `export:${flowId}:${Date.now()}.svg`;
+        await redis.set(key, svgResult.content, "EX", 3600);
+        result = {
+          success: true,
+          downloadUrl: `/api/export/download?key=${key}`,
+          format: "png",
+          fileSize: svgResult.fileSize,
+          svgContent: svgResult.content,
+        };
         break;
-      case "pdf":
-        result = await exportAsPDF(flowGraph, flowId);
+      }
+      case "pdf": {
+        const pdfResult = exportAsPDFData(flowGraph);
+        if (!pdfResult.content) throw new Error("Failed to generate PDF data");
+        const key = `export:${flowId}:${Date.now()}.svg`;
+        await redis.set(key, pdfResult.content, "EX", 3600);
+        result = {
+          success: true,
+          downloadUrl: `/api/export/download?key=${key}`,
+          format: "pdf",
+          fileSize: pdfResult.fileSize,
+          svgContent: pdfResult.content,
+        };
         break;
+      }
       default:
         throw new Error(`Unsupported format: ${format}`);
     }
@@ -71,128 +131,6 @@ export async function processExportJob(job: Job<ExportRenderJobData>): Promise<{
     console.error(`[ExportWorker] Export failed for flow ${flowId}:`, error);
     throw error;
   }
-}
-
-async function exportAsJSON(
-  flowGraph: FlowGraph,
-  flowId: string,
-): Promise<{
-  success: boolean;
-  downloadUrl: string;
-  format: "json";
-  fileSize: number;
-}> {
-  const json = JSON.stringify(flowGraph, null, 2);
-  const buffer = Buffer.from(json, "utf-8");
-
-  const key = `export:${flowId}:${Date.now()}.json`;
-  await redis.set(key, buffer.toString("base64"), "EX", 3600);
-
-  return {
-    success: true,
-    downloadUrl: `/api/export/download?key=${key}`,
-    format: "json",
-    fileSize: buffer.length,
-  };
-}
-
-async function exportAsMermaid(
-  flowGraph: FlowGraph,
-  flowId: string,
-): Promise<{
-  success: boolean;
-  downloadUrl: string;
-  format: "mermaid";
-  fileSize: number;
-}> {
-  const mermaid = toMermaid(flowGraph);
-  const buffer = Buffer.from(mermaid, "utf-8");
-
-  const key = `export:${flowId}:${Date.now()}.mmd`;
-  await redis.set(key, buffer.toString("base64"), "EX", 3600);
-
-  return {
-    success: true,
-    downloadUrl: `/api/export/download?key=${key}`,
-    format: "mermaid",
-    fileSize: buffer.length,
-  };
-}
-
-async function exportAsPNG(
-  flowGraph: FlowGraph,
-  flowId: string,
-): Promise<{
-  success: boolean;
-  downloadUrl: string;
-  format: "png";
-  fileSize: number;
-}> {
-  const { toReactFlowFormat } = await import("@createflowchart/core");
-  const { nodes, edges } = toReactFlowFormat(flowGraph);
-
-  console.log(
-    `[ExportWorker] Would render PNG for ${nodes.length} nodes and ${edges.length} edges`,
-  );
-
-  const key = `export:${flowId}:${Date.now()}.png`;
-  await redis.set(key, "placeholder-png-base64", "EX", 3600);
-
-  return {
-    success: true,
-    downloadUrl: `/api/export/download?key=${key}`,
-    format: "png",
-    fileSize: 0,
-  };
-}
-
-async function exportAsSVG(
-  flowGraph: FlowGraph,
-  flowId: string,
-): Promise<{
-  success: boolean;
-  downloadUrl: string;
-  format: "svg";
-  fileSize: number;
-}> {
-  const { toReactFlowFormat } = await import("@createflowchart/core");
-  const { nodes, edges } = toReactFlowFormat(flowGraph);
-
-  console.log(
-    `[ExportWorker] Would render SVG for ${nodes.length} nodes and ${edges.length} edges`,
-  );
-
-  const key = `export:${flowId}:${Date.now()}.svg`;
-  await redis.set(key, "placeholder-svg-content", "EX", 3600);
-
-  return {
-    success: true,
-    downloadUrl: `/api/export/download?key=${key}`,
-    format: "svg",
-    fileSize: 0,
-  };
-}
-
-async function exportAsPDF(
-  flowGraph: FlowGraph,
-  flowId: string,
-): Promise<{
-  success: boolean;
-  downloadUrl: string;
-  format: "pdf";
-  fileSize: number;
-}> {
-  console.log(`[ExportWorker] Would render PDF for flow ${flowId}`);
-
-  const key = `export:${flowId}:${Date.now()}.pdf`;
-  await redis.set(key, "placeholder-pdf-base64", "EX", 3600);
-
-  return {
-    success: true,
-    downloadUrl: `/api/export/download?key=${key}`,
-    format: "pdf",
-    fileSize: 0,
-  };
 }
 
 export function createExportWorker() {

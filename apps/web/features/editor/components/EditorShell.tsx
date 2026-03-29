@@ -30,7 +30,7 @@ export function EditorShell({
   const setInitialData = useEditorStore((s) => s.setInitialData);
   const { runLayout } = useAutoLayout();
 
-  const { provider } = useYjs(initialData?.id);
+  const { provider, updateLocalCursor } = useYjs(initialData?.id);
 
   useAutosave();
   useShortcuts();
@@ -55,7 +55,7 @@ export function EditorShell({
       <Toolbar />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         <main style={{ flex: 1, position: "relative" }}>
-          <Canvas provider={provider} />
+          <Canvas provider={provider} updateLocalCursor={updateLocalCursor} />
         </main>
         <Sidebar />
       </div>

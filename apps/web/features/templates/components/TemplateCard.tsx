@@ -1,46 +1,31 @@
 "use client";
 
-import Link from "next/link";
 import { Badge } from "@/shared/ui/Badge";
 import { Button } from "@/shared/ui/Button";
-import styles from "../styles/dashboard.module.css";
+import styles from "../styles/templates.module.css";
+import type { TemplateWithAuthor } from "../services/template-service";
+import Link from "next/link";
 
-interface FlowCardProps {
-  id: string;
-  title: string;
-  isPublic: boolean;
-  likeCount: number;
-  updatedAt: string;
-  nodeCount?: number;
-  onDelete?: (id: string) => void;
+interface TemplateCardProps {
+  template: TemplateWithAuthor;
   onLike?: (id: string) => void;
   onUnlike?: (id: string) => void;
   userLiked?: boolean;
-  showLikeButton?: boolean;
+  showActions?: boolean;
 }
 
-export function FlowCard({
-  id,
-  title,
-  isPublic,
-  likeCount,
-  updatedAt,
-  nodeCount = 0,
-  onDelete,
+export function TemplateCard({
+  template,
   onLike,
   onUnlike,
   userLiked = false,
-  showLikeButton = false,
-}: FlowCardProps) {
-  const formattedDate = new Date(updatedAt).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
+  showActions = true,
+}: TemplateCardProps) {
+  const nodeCount = template.data.nodes?.length || 0;
 
   return (
     <div className={styles.card}>
-      <Link href={`/editor/${id}`} className={styles.cardLink}>
+      <Link href={`/templates/${template.id}`} className={styles.cardLink}>
         <div className={styles.cardPreview}>
           <svg
             width="48"
@@ -58,48 +43,42 @@ export function FlowCard({
           </svg>
         </div>
         <div className={styles.cardContent}>
-          <h3 className={styles.cardTitle}>{title}</h3>
+          <h3 className={styles.cardTitle}>{template.title}</h3>
+          {template.description && (
+            <p className={styles.cardDescription}>{template.description}</p>
+          )}
           <div className={styles.cardMeta}>
-            <span>{formattedDate}</span>
-            <span>{nodeCount} nodes</span>
-            {isPublic && <Badge variant="success">Public</Badge>}
+            <div className={styles.cardStats}>
+              <span>{nodeCount} nodes</span>
+              <span>{template.usageCount} uses</span>
+              <span>{template.likeCount} likes</span>
+            </div>
+            {template.category && (
+              <Badge variant="default">{template.category}</Badge>
+            )}
           </div>
         </div>
       </Link>
-      <div className={styles.cardActions}>
-        {showLikeButton && (
+      {showActions && (
+        <div className={styles.cardActions}>
           <button
             className={`${styles.likeButton} ${userLiked ? styles.liked : ""}`}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               if (userLiked) {
-                onUnlike?.(id);
+                onUnlike?.(template.id);
               } else {
-                onLike?.(id);
+                onLike?.(template.id);
               }
             }}
             title={userLiked ? "Unlike" : "Like"}
           >
             <HeartIcon filled={userLiked} />
-            <span>{likeCount}</span>
+            <span>{template.likeCount}</span>
           </button>
-        )}
-        {!showLikeButton && (
-          <button
-            className={styles.iconButton}
-            onClick={(e) => {
-              e.preventDefault();
-              if (confirm("Are you sure you want to delete this flow?")) {
-                onDelete?.(id);
-              }
-            }}
-            title="Delete flow"
-          >
-            🗑️
-          </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

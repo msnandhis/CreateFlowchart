@@ -6,6 +6,7 @@ import {
 } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import * as Y from "yjs";
+import { redis, closeRedis } from "./redis";
 import { getPersistence, closePersistence } from "./persistence";
 import {
   startPersistenceWorker,
@@ -19,37 +20,27 @@ import {
 
 const PORT = parseInt(process.env.PORT ?? "4000", 10);
 
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_WINDOW = 60 * 1000;
+const RATE_LIMIT_WINDOW = 60;
 const RATE_LIMIT_MAX = 100;
+const RATE_LIMIT_PREFIX = "ratelimit:";
 
-function checkRateLimit(clientId: string): boolean {
+async function checkRateLimit(clientId: string): Promise<boolean> {
+  const key = `${RATE_LIMIT_PREFIX}${clientId}`;
   const now = Date.now();
-  const entry = rateLimitMap.get(clientId);
 
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(clientId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-    return true;
-  }
+  const multi = redis.multi();
+  multi.zremrangebyscore(key, 0, now - RATE_LIMIT_WINDOW * 1000);
+  multi.zadd(key, now, `${now}-${Math.random()}`);
+  multi.zcard(key);
+  multi.expire(key, RATE_LIMIT_WINDOW);
 
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return false;
-  }
+  const results = await multi.exec();
 
-  entry.count++;
-  return true;
+  if (!results) return false;
+
+  const count = results[2][1] as number;
+  return count <= RATE_LIMIT_MAX;
 }
-
-function cleanupRateLimit(): void {
-  const now = Date.now();
-  for (const [key, value] of rateLimitMap.entries()) {
-    if (now > value.resetAt) {
-      rateLimitMap.delete(key);
-    }
-  }
-}
-
-setInterval(cleanupRateLimit, RATE_LIMIT_WINDOW);
 
 const server = createServer((req: IncomingMessage, res: ServerResponse) => {
   if (req.url === "/health") {
@@ -72,7 +63,7 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
 
 const wss = new WebSocketServer({ noServer: true });
 
-wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+wss.on("connection", async (ws: WebSocket, req: IncomingMessage) => {
   const url = new URL(req.url || "/", `http://${req.headers.host}`);
   const pathParts = url.pathname.split("/").filter(Boolean);
 
@@ -80,7 +71,8 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
     const roomName = pathParts.slice(1).join("/");
     const clientId = `room-${roomName}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-    if (!checkRateLimit(clientId)) {
+    const allowed = await checkRateLimit(clientId);
+    if (!allowed) {
       ws.close(4003, "Rate limit exceeded");
       return;
     }
@@ -96,10 +88,11 @@ wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
       return;
     }
 
-    ws.on("message", (data: Uint8Array, isBinary: boolean) => {
+    ws.on("message", async (data: Uint8Array, isBinary: boolean) => {
       if (!isBinary) return;
 
-      if (!checkRateLimit(clientId)) {
+      const rateAllowed = await checkRateLimit(clientId);
+      if (!rateAllowed) {
         ws.close(4003, "Rate limit exceeded");
         return;
       }
@@ -167,6 +160,7 @@ async function shutdown(): Promise<void> {
   console.log("Shutting down realtime server...");
   await stopPersistenceWorker();
   closePersistence();
+  await closeRedis();
   wss.close();
   server.close(() => process.exit(0));
 }
