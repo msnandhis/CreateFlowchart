@@ -13,9 +13,11 @@ interface Flow {
   id: string;
   title: string;
   data: { nodes: unknown[]; edges: unknown[] };
+  document?: import("@createflowchart/schema").DiagramDocument;
   isPublic: boolean;
   likeCount: number;
   updatedAt: string;
+  nodeCount?: number;
 }
 
 export function FlowList() {
@@ -119,7 +121,8 @@ export function FlowList() {
             isPublic={flow.isPublic}
             likeCount={flow.likeCount}
             updatedAt={flow.updatedAt}
-            nodeCount={flow.data?.nodes?.length ?? 0}
+            nodeCount={flow.nodeCount ?? flow.document?.nodes.length ?? flow.data?.nodes?.length ?? 0}
+            document={flow.document}
             onDelete={(id) => deleteMutation.mutate(id)}
           />
         ))}

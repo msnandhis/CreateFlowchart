@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { Badge } from "@/shared/ui/Badge";
-import { Button } from "@/shared/ui/Button";
 import styles from "../styles/dashboard.module.css";
+import type { DiagramDocument } from "@createflowchart/schema";
+import { DocumentCardPreview } from "@/features/diagram/components/DocumentCardPreview";
 
 interface FlowCardProps {
   id: string;
@@ -12,6 +13,7 @@ interface FlowCardProps {
   likeCount: number;
   updatedAt: string;
   nodeCount?: number;
+  document?: DiagramDocument;
   onDelete?: (id: string) => void;
   onLike?: (id: string) => void;
   onUnlike?: (id: string) => void;
@@ -26,6 +28,7 @@ export function FlowCard({
   likeCount,
   updatedAt,
   nodeCount = 0,
+  document,
   onDelete,
   onLike,
   onUnlike,
@@ -42,20 +45,27 @@ export function FlowCard({
     <div className={styles.card}>
       <Link href={`/editor/${id}`} className={styles.cardLink}>
         <div className={styles.cardPreview}>
-          <svg
-            width="48"
-            height="48"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--color-text-muted)"
-            strokeWidth="1"
-          >
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <rect x="14" y="14" width="7" height="7" rx="1" />
-            <path d="M10 6.5h4M6.5 10v4M17.5 10v4M10 17.5h4" />
-          </svg>
+          {document ? (
+            <DocumentCardPreview
+              document={document}
+              className={styles.cardPreviewCanvas}
+            />
+          ) : (
+            <svg
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--color-text-muted)"
+              strokeWidth="1"
+            >
+              <rect x="3" y="3" width="7" height="7" rx="1" />
+              <rect x="14" y="3" width="7" height="7" rx="1" />
+              <rect x="3" y="14" width="7" height="7" rx="1" />
+              <rect x="14" y="14" width="7" height="7" rx="1" />
+              <path d="M10 6.5h4M6.5 10v4M17.5 10v4M10 17.5h4" />
+            </svg>
+          )}
         </div>
         <div className={styles.cardContent}>
           <h3 className={styles.cardTitle}>{title}</h3>

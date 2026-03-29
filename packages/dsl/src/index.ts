@@ -69,10 +69,18 @@ export function mermaidToDocument(
   source: string,
   base?: Partial<DiagramDocument>,
 ): DiagramDocument {
-  return astToDocument(parseMermaidFlowchart(source), base);
+  return astToDocument(parseMermaid(source), base);
 }
 
 export function documentToMermaid(document: DiagramDocument): string {
+  if (document.family === "sequence") {
+    return documentToMermaidSequence(document);
+  }
+
+  if (document.family === "state") {
+    return documentToMermaidState(document);
+  }
+
   const lines: string[] = ["flowchart TD"];
   const renderedNodes = new Set<string>();
   const rootContainerIds = document.containers
@@ -150,6 +158,19 @@ export function documentToMermaid(document: DiagramDocument): string {
   }
 
   return lines.join("\n");
+}
+
+export function parseMermaid(source: string): DiagramDslAst {
+  const trimmed = source.trim();
+  if (/^sequenceDiagram\b/i.test(trimmed)) {
+    return parseMermaidSequence(trimmed);
+  }
+
+  if (/^stateDiagram(?:-v2)?\b/i.test(trimmed)) {
+    return parseMermaidState(trimmed);
+  }
+
+  return parseMermaidFlowchart(trimmed);
 }
 
 export function printFlowDsl(ast: DiagramDslAst): string {
@@ -579,6 +600,166 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
   };
 }
 
+export function parseMermaidSequence(source: string): DiagramDslAst {
+  const lines = source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("%%"));
+
+  const participants = new Map<string, DiagramNode>();
+  const edges: DiagramEdge[] = [];
+
+  const ensureParticipant = (id: string, label?: string) => {
+    if (participants.has(id)) {
+      return participants.get(id)!;
+    }
+
+    const index = participants.size;
+    const node: DiagramNode = {
+      id,
+      family: "sequence",
+      kind: "participant",
+      shape: "participant",
+      position: { x: 120 + index * 220, y: 72 },
+      size: { width: 160, height: 56 },
+      ports: [],
+      content: { title: label ?? id, labels: [] },
+      style: { tokens: {} },
+      resizePolicy: "content",
+      metadata: {
+        family: "sequence",
+        semanticKind: "participant",
+        shapeId: "participant",
+      },
+    };
+
+    participants.set(id, node);
+    return node;
+  };
+
+  for (const line of lines.slice(1)) {
+    const participantMatch = line.match(/^(participant|actor)\s+([A-Za-z0-9_-]+)(?:\s+as\s+(.+))?$/i);
+    if (participantMatch) {
+      ensureParticipant(
+        participantMatch[2],
+        participantMatch[3]?.replace(/^"|"$/g, ""),
+      );
+      continue;
+    }
+
+    const messageMatch = line.match(
+      /^([A-Za-z0-9_-]+)\s*(-{1,2}>{1,2}|-->>|->>|->)\s*([A-Za-z0-9_-]+)\s*:\s*(.+)$/i,
+    );
+    if (messageMatch) {
+      const [, from, arrow, to, text] = messageMatch;
+      ensureParticipant(from);
+      ensureParticipant(to);
+
+      edges.push({
+        id: `seq_${from}_${to}_${edges.length + 1}`,
+        family: "sequence",
+        kind: arrow.includes("--") ? "return-message" : "message-flow",
+        sourceNodeId: from,
+        targetNodeId: to,
+        routing: "straight",
+        waypoints: [],
+        labels: [{ text: text.trim(), position: "center" }],
+        startMarker: "none",
+        endMarker: "arrow",
+        style: { tokens: {} },
+        metadata: {},
+      });
+    }
+  }
+
+  return {
+    family: "sequence",
+    kit: "sequence-core",
+    title: "Imported Mermaid Sequence",
+    nodes: Array.from(participants.values()),
+    edges,
+    containers: [],
+  };
+}
+
+export function parseMermaidState(source: string): DiagramDslAst {
+  const lines = source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("%%"));
+
+  const nodes = new Map<string, DiagramNode>();
+  const edges: DiagramEdge[] = [];
+
+  const ensureState = (id: string) => {
+    const normalizedId = id === "[*]" ? `state_${nodes.size + 1}` : id;
+    if (nodes.has(normalizedId)) {
+      return nodes.get(normalizedId)!;
+    }
+
+    const index = nodes.size;
+    const isTerminal = id === "[*]";
+    const node: DiagramNode = {
+      id: normalizedId,
+      family: "state",
+      kind: isTerminal ? "terminal-state" : "state-node",
+      shape: isTerminal ? "terminator-start" : "state",
+      position: { x: 120 + (index % 3) * 240, y: 120 + Math.floor(index / 3) * 140 },
+      size: isTerminal ? { width: 64, height: 64 } : { width: 180, height: 72 },
+      ports: [],
+      content: { title: isTerminal ? "Start / End" : id, labels: [] },
+      style: { tokens: {} },
+      resizePolicy: "content",
+      metadata: {
+        family: "state",
+        semanticKind: isTerminal ? "terminal-state" : "state-node",
+        shapeId: isTerminal ? "terminator-start" : "state",
+        originalId: id,
+      },
+    };
+
+    nodes.set(normalizedId, node);
+    return node;
+  };
+
+  for (const line of lines.slice(1)) {
+    const transitionMatch = line.match(/^(.+?)\s*-->\s*(.+?)(?:\s*:\s*(.+))?$/);
+    if (!transitionMatch) {
+      continue;
+    }
+
+    const [, rawFrom, rawTo, rawLabel] = transitionMatch;
+    const from = rawFrom.trim();
+    const to = rawTo.trim();
+    const sourceNode = ensureState(from);
+    const targetNode = ensureState(to);
+
+    edges.push({
+      id: `state_${sourceNode.id}_${targetNode.id}_${edges.length + 1}`,
+      family: "state",
+      kind: "state-transition",
+      sourceNodeId: sourceNode.id,
+      targetNodeId: targetNode.id,
+      routing: "orthogonal",
+      waypoints: [],
+      labels: rawLabel ? [{ text: rawLabel.trim(), position: "center" }] : [],
+      startMarker: "none",
+      endMarker: "arrow",
+      style: { tokens: {} },
+      metadata: {},
+    });
+  }
+
+  return {
+    family: "state",
+    kit: "state-core",
+    title: "Imported Mermaid State Diagram",
+    nodes: Array.from(nodes.values()),
+    edges,
+    containers: [],
+  };
+}
+
 function tokenize(line: string): string[] {
   const matches = line.match(/"([^"\\]*(?:\\.[^"\\]*)*)"|[^\s]+/g) ?? [];
   return matches.map((token) => token.trim());
@@ -656,4 +837,46 @@ function parseMermaidNodeToken(token: string): {
     shape: "process",
     size: { width: 180, height: 64 },
   };
+}
+
+function documentToMermaidSequence(document: DiagramDocument): string {
+  const lines: string[] = ["sequenceDiagram"];
+
+  for (const node of document.nodes) {
+    lines.push(`    participant ${node.id} as ${escapeMermaidText(node.content.title)}`);
+  }
+
+  for (const edge of document.edges) {
+    const label = edge.labels[0]?.text ?? edge.kind;
+    const arrow = edge.kind.includes("return") ? "-->>" : "->>";
+    lines.push(
+      `    ${edge.sourceNodeId}${arrow}${edge.targetNodeId}: ${escapeMermaidText(label)}`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
+function documentToMermaidState(document: DiagramDocument): string {
+  const lines: string[] = ["stateDiagram-v2"];
+
+  for (const edge of document.edges) {
+    const from = document.nodes.find((node) => node.id === edge.sourceNodeId);
+    const to = document.nodes.find((node) => node.id === edge.targetNodeId);
+    const fromId = from?.kind === "terminal-state" ? "[*]" : edge.sourceNodeId;
+    const toId = to?.kind === "terminal-state" ? "[*]" : edge.targetNodeId;
+    const label = edge.labels[0]?.text;
+
+    lines.push(
+      label
+        ? `    ${fromId} --> ${toId}: ${escapeMermaidText(label)}`
+        : `    ${fromId} --> ${toId}`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
+function escapeMermaidText(value: string): string {
+  return value.replace(/"/g, "'").trim();
 }

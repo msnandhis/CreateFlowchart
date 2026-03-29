@@ -3,17 +3,20 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useEditorStore } from "../stores/editorStore";
 import {
-  createEmptyFlowGraph,
   createStarterFlowGraph,
-  validateFlowGraph,
   type FlowGraph,
 } from "@createflowchart/core";
+import type { DiagramDocument } from "@createflowchart/schema";
+import { createPersistedFlowEnvelope, normalizePersistedFlow } from "../lib/persisted-flow";
+import { documentToFlowGraph } from "../lib/document-compat";
 
 const STORAGE_KEY = "createflowchart_sandbox";
 const DEBOUNCE_MS = 2000;
 
 interface StoredSandbox {
-  flowGraph: FlowGraph;
+  data?: FlowGraph;
+  document?: DiagramDocument;
+  formatVersion?: string;
   title: string;
   updatedAt: string;
 }
@@ -30,19 +33,25 @@ function debounce<T extends (...args: Parameters<T>) => void>(
 }
 
 export function useSandboxStorage() {
-  const flowGraph = useEditorStore((s) => s.flowGraph);
+  const document = useEditorStore((s) => s.document);
   const title = useEditorStore((s) => s.title);
-  const setFlowGraph = useEditorStore((s) => s.setFlowGraph);
-  const setTitle = useEditorStore((s) => s.setTitle);
   const loadFlow = useEditorStore((s) => s.loadFlow);
+  const setDocument = useEditorStore((s) => s.setDocument);
   const isDirty = useEditorStore((s) => s.isDirty);
   const isFirstRender = useRef(true);
 
   const saveToStorage = useCallback(
-    debounce((fg: FlowGraph, t: string) => {
+    debounce((nextDocument: DiagramDocument, t: string) => {
       try {
+        const envelope = createPersistedFlowEnvelope({
+          data: documentToFlowGraph(nextDocument),
+          document: nextDocument,
+          title: t,
+        });
         const data: StoredSandbox = {
-          flowGraph: fg,
+          data: envelope.legacy,
+          document: envelope.document,
+          formatVersion: envelope.formatVersion,
           title: t,
           updatedAt: new Date().toISOString(),
         };
@@ -60,10 +69,12 @@ export function useSandboxStorage() {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const data: StoredSandbox = JSON.parse(stored);
-        const validation = validateFlowGraph(data.flowGraph);
-        if (validation.success) {
-          return { flowGraph: validation.data, title: data.title };
-        }
+        const normalized = normalizePersistedFlow({
+          data: data.data ?? createStarterFlowGraph(undefined, true),
+          document: data.document,
+          title: data.title,
+        });
+        return { document: normalized.document, title: data.title };
       }
     } catch (error) {
       console.error("[SandboxStorage] Load failed:", error);
@@ -86,7 +97,7 @@ export function useSandboxStorage() {
         const stored = loadFromStorage();
 
         if (stored) {
-          loadFlow(stored.flowGraph, null, "sandbox", stored.title);
+          setDocument(stored.document);
           return;
         }
 
@@ -98,18 +109,18 @@ export function useSandboxStorage() {
         }
       }
     },
-    [loadFlow, loadFromStorage],
+    [loadFlow, loadFromStorage, setDocument],
   );
 
   useEffect(() => {
-    if (isDirty && flowGraph.nodes.length > 0) {
-      saveToStorage(flowGraph, title);
+    if (isDirty && document.nodes.length > 0) {
+      saveToStorage(document, title);
     }
-  }, [flowGraph, title, isDirty, saveToStorage]);
+  }, [document, title, isDirty, saveToStorage]);
 
   return {
     initializeSandbox,
-    saveToStorage: (fg: FlowGraph, t: string) => saveToStorage(fg, t),
+    saveToStorage: (doc: DiagramDocument, t: string) => saveToStorage(doc, t),
     loadFromStorage,
     clearStorage,
     hasStoredData,

@@ -8,7 +8,7 @@ import {
   BackgroundVariant,
   type NodeMouseHandler,
   type EdgeMouseHandler,
-  type NodeDragHandler,
+  type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -38,7 +38,7 @@ export function Canvas({ provider, updateLocalCursor }: CanvasProps) {
 
   const onNodeClick: NodeMouseHandler = (_, node) => setSelectedNode(node.id);
   const onEdgeClick: EdgeMouseHandler = (_, edge) => setSelectedEdge(edge.id);
-  const handleNodeDragStop: NodeDragHandler = (event, node) =>
+  const handleNodeDragStop = (event: React.MouseEvent | React.TouchEvent, node: Node) =>
     onNodeDragStop(event, node);
 
   const onPaneClick = () => {

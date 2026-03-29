@@ -10,7 +10,7 @@ const elk = new ELK();
  * Consistent with the 'clean and non-cluttered' user requirement.
  */
 export function useLayout() {
-  const { rfNodes, rfEdges, setFlowGraph, flowGraph } = useEditorStore();
+  const { rfNodes, rfEdges, document, setDocument } = useEditorStore();
   const { fitView } = useReactFlow();
 
   const performLayout = useCallback(async () => {
@@ -38,26 +38,29 @@ export function useLayout() {
 
     try {
       const layoutedGraph = await elk.layout(elkGraph);
-      
-      const newNodes = flowGraph.nodes.map((node) => {
-        const elkNode = layoutedGraph.children?.find((c) => c.id === node.id);
-        if (elkNode) {
-          return {
-            ...node,
-            position: { x: elkNode.x || 0, y: elkNode.y || 0 },
-          };
-        }
-        return node;
-      });
 
-      setFlowGraph({ ...flowGraph, nodes: newNodes });
-      
+      const nextDocument = {
+        ...document,
+        nodes: document.nodes.map((node) => {
+          const elkNode = layoutedGraph.children?.find((c) => c.id === node.id);
+          if (elkNode) {
+            return {
+              ...node,
+              position: { x: elkNode.x || 0, y: elkNode.y || 0 },
+            };
+          }
+          return node;
+        }),
+      };
+
+      setDocument(nextDocument);
+
       // Allow React Flow to update before fitting view
       setTimeout(() => fitView({ duration: 800 }), 100);
     } catch (e) {
       console.error("[Layout] ELK error:", e);
     }
-  }, [rfNodes, rfEdges, flowGraph, setFlowGraph, fitView]);
+  }, [rfNodes, rfEdges, document, setDocument, fitView]);
 
   return { performLayout };
 }

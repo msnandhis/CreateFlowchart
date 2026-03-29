@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Button } from "@/shared/ui/Button";
 import { FlowCard } from "@/features/dashboard/components/FlowCard";
 import styles from "./gallery.module.css";
@@ -27,7 +26,6 @@ interface FlowWithAuthor {
 }
 
 export default function GalleryPage() {
-  const router = useRouter();
   const [flows, setFlows] = useState<FlowWithAuthor[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -49,9 +47,9 @@ export default function GalleryPage() {
     }
   };
 
-  useState(() => {
+  useEffect(() => {
     fetchFlows();
-  });
+  }, [sortBy]);
 
   const handleLike = async (flowId: string) => {
     try {
@@ -121,10 +119,7 @@ export default function GalleryPage() {
           <div className={styles.sortSelect}>
             <select
               value={sortBy}
-              onChange={(e) => {
-                setSortBy(e.target.value as typeof sortBy);
-                fetchFlows();
-              }}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
               className={styles.select}
             >
               <option value="recent">Most Recent</option>
@@ -165,7 +160,8 @@ export default function GalleryPage() {
                 isPublic={flow.isPublic}
                 likeCount={flow.likeCount}
                 updatedAt={flow.updatedAt}
-                nodeCount={flow.nodeCount ?? (flow.data as any)?.nodes?.length || 0}
+                nodeCount={flow.nodeCount ?? ((flow.data as any)?.nodes?.length || 0)}
+                document={flow.document as any}
                 userLiked={flow.userLiked}
                 showLikeButton
                 onLike={handleLike}

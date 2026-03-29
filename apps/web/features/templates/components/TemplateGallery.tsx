@@ -3,12 +3,10 @@
 import { useState } from "react";
 import { Button } from "@/shared/ui/Button";
 import { Input } from "@/shared/ui/Input";
-import { Modal } from "@/shared/ui/Modal";
 import { TemplateCard } from "./TemplateCard";
 import styles from "../styles/templates.module.css";
 import type {
   TemplateWithAuthor,
-  SearchTemplatesInput,
 } from "../services/template-service";
 
 interface TemplateGalleryProps {

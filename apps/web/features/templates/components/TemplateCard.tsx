@@ -1,10 +1,10 @@
 "use client";
 
 import { Badge } from "@/shared/ui/Badge";
-import { Button } from "@/shared/ui/Button";
 import styles from "../styles/templates.module.css";
 import type { TemplateWithAuthor } from "../services/template-service";
 import Link from "next/link";
+import { DocumentCardPreview } from "@/features/diagram/components/DocumentCardPreview";
 
 interface TemplateCardProps {
   template: TemplateWithAuthor;
@@ -27,20 +27,10 @@ export function TemplateCard({
     <div className={styles.card}>
       <Link href={`/templates/${template.id}`} className={styles.cardLink}>
         <div className={styles.cardPreview}>
-          <svg
-            width="48"
-            height="48"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="var(--color-text-muted)"
-            strokeWidth="1"
-          >
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="3" width="7" height="7" rx="1" />
-            <rect x="3" y="14" width="7" height="7" rx="1" />
-            <rect x="14" y="14" width="7" height="7" rx="1" />
-            <path d="M10 6.5h4M6.5 10v4M17.5 10v4M10 17.5h4" />
-          </svg>
+          <DocumentCardPreview
+            document={template.document}
+            className={styles.cardPreviewCanvas}
+          />
         </div>
         <div className={styles.cardContent}>
           <h3 className={styles.cardTitle}>{template.title}</h3>

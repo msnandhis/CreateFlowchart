@@ -47,6 +47,9 @@ export interface AnalyzeResult {
 export interface ImproveResult {
   originalDocument: DiagramDocument;
   originalDsl: string;
+  document: DiagramDocument;
+  dsl: string;
+  legacyFlowGraph: FlowGraph;
   improvedDocument: DiagramDocument;
   improvedDsl: string;
   original: FlowGraph;
