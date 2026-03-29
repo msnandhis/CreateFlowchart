@@ -5,7 +5,6 @@ import {
   type ServerResponse,
 } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
-import * as Y from "yjs";
 import { redis, closeRedis } from "./redis";
 import { getPersistence, closePersistence } from "./persistence";
 import {
@@ -13,9 +12,10 @@ import {
   stopPersistenceWorker,
 } from "./persistence-worker";
 import {
+  getActiveRoomNames,
   handleSyncConnection,
-  createAwareness,
-  clearAwareness,
+  getRoomConnections,
+  getRoomSession,
 } from "./handlers";
 
 const PORT = parseInt(process.env.PORT ?? "4000", 10);
@@ -53,7 +53,17 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
 
   if (req.url === "/rooms") {
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ activeRooms: 0 }));
+    res.end(
+      JSON.stringify({
+        activeRooms: getActiveRoomNames().length,
+        rooms: getActiveRoomNames().map((roomName) => ({
+          roomName,
+          connections: getRoomConnections(roomName).length,
+          protocolVersion: getRoomSession(roomName)?.protocolVersion ?? null,
+          updatedAt: getRoomSession(roomName)?.updatedAt ?? null,
+        })),
+      }),
+    );
     return;
   }
 
@@ -77,18 +87,13 @@ wss.on("connection", async (ws: WebSocket, req: IncomingMessage) => {
       return;
     }
 
-    const ydoc = new Y.Doc();
-    createAwareness(roomName, ydoc);
-
-    const result = handleSyncConnection(ws, req, roomName);
+    const result = await handleSyncConnection(ws, req, roomName);
 
     if (!result.success) {
-      ydoc.destroy();
-      clearAwareness(roomName);
       return;
     }
 
-    ws.on("message", async (data: Uint8Array, isBinary: boolean) => {
+    ws.on("message", async (_data: Uint8Array, isBinary: boolean) => {
       if (!isBinary) return;
 
       const rateAllowed = await checkRateLimit(clientId);
@@ -98,8 +103,10 @@ wss.on("connection", async (ws: WebSocket, req: IncomingMessage) => {
       }
 
       try {
-        const update = new Uint8Array(data);
-        Y.applyUpdate(ydoc, update, "remote");
+        const session = getRoomSession(roomName);
+        if (!session) {
+          ws.close(1011, "Room session unavailable");
+        }
       } catch (err) {
         console.error(
           `[Server] Error processing message in room ${roomName}:`,
@@ -109,15 +116,10 @@ wss.on("connection", async (ws: WebSocket, req: IncomingMessage) => {
     });
 
     ws.on("close", () => {
-      clearAwareness(roomName);
-      ydoc.destroy();
-      console.log(`[Server] Connection closed for room: ${roomName}`);
-    });
-
-    ws.on("close", () => {
-      clearAwareness(roomName);
-      ydoc.destroy();
-      console.log(`[Server] Connection closed for room: ${roomName}`);
+      const remaining = getRoomConnections(roomName).length;
+      console.log(
+        `[Server] Connection closed for room: ${roomName} (${remaining} active)`,
+      );
     });
 
     console.log(`[Server] New Yjs connection for room: ${roomName}`);

@@ -5,20 +5,37 @@ import {
   getPersistence,
   type PersistedRoomState,
   type RoomPersistence,
+  ROOM_PROTOCOL_VERSION,
 } from "../persistence";
+import { createAwareness, clearAwareness } from "./awareness";
 
 interface SyncConnection {
   ws: WebSocket;
-  doc: Y.Doc;
   userId: string;
   roomName: string;
   isAlive: boolean;
 }
 
+interface RoomSession {
+  roomName: string;
+  doc: Y.Doc;
+  protocolVersion: number;
+  updatedAt: string;
+}
+
 const connections = new Map<string, SyncConnection[]>();
+const roomSessions = new Map<string, RoomSession>();
 
 export function getRoomConnections(roomName: string): SyncConnection[] {
   return connections.get(roomName) || [];
+}
+
+export function getActiveRoomNames(): string[] {
+  return Array.from(roomSessions.keys());
+}
+
+export function getRoomSession(roomName: string): RoomSession | null {
+  return roomSessions.get(roomName) ?? null;
 }
 
 export function addConnection(conn: SyncConnection): void {
@@ -36,6 +53,10 @@ export function removeConnection(roomName: string, ws: WebSocket): void {
     room.splice(idx, 1);
     if (room.length === 0) {
       connections.delete(roomName);
+      const session = roomSessions.get(roomName);
+      session?.doc.destroy();
+      roomSessions.delete(roomName);
+      clearAwareness(roomName);
     }
   }
 }
@@ -55,17 +76,18 @@ export function broadcastToRoom(
   }
 }
 
-export function handleSyncConnection(
+export async function handleSyncConnection(
   ws: WebSocket,
   _req: IncomingMessage,
   roomName: string,
-): { success: boolean; error?: string; userId?: string } {
-  const doc = new Y.Doc();
+): Promise<{ success: boolean; error?: string; userId?: string }> {
   const persistence = getPersistence();
+  const session = await getOrCreateRoomSession(roomName, persistence);
+  const { doc } = session;
+  createAwareness(roomName, doc);
 
   const conn: SyncConnection = {
     ws,
-    doc,
     userId: `guest-${Date.now()}`,
     roomName,
     isAlive: true,
@@ -83,6 +105,7 @@ export function handleSyncConnection(
     try {
       const update = new Uint8Array(data);
       Y.applyUpdate(doc, update, "remote");
+      session.updatedAt = new Date().toISOString();
 
       broadcastToRoom(roomName, ws, update);
       void persistRoom(roomName, persistence);
@@ -109,18 +132,39 @@ export function handleSyncConnection(
     doc.destroy();
   });
 
-  void loadPersistedDoc(doc, roomName, persistence);
-
   console.log(
     `[Sync] New connection for room: ${roomName}, user: guest`,
   );
   return { success: true, userId: "guest" };
 }
 
+async function getOrCreateRoomSession(
+  roomName: string,
+  persistence: RoomPersistence | null,
+): Promise<RoomSession> {
+  const existing = roomSessions.get(roomName);
+  if (existing) {
+    return existing;
+  }
+
+  const doc = new Y.Doc();
+  const session: RoomSession = {
+    roomName,
+    doc,
+    protocolVersion: ROOM_PROTOCOL_VERSION,
+    updatedAt: new Date().toISOString(),
+  };
+
+  await loadPersistedDoc(doc, roomName, persistence, session);
+  roomSessions.set(roomName, session);
+  return session;
+}
+
 async function loadPersistedDoc(
   doc: Y.Doc,
   roomName: string,
   persistence: RoomPersistence | null,
+  session?: RoomSession,
 ): Promise<void> {
   if (!persistence) return;
 
@@ -130,6 +174,10 @@ async function loadPersistedDoc(
       const update = new Uint8Array(persisted.yjsSnapshot);
       Y.applyUpdate(doc, update, "persisted");
       restoreCanonicalDocument(doc, persisted);
+      if (session) {
+        session.protocolVersion = persisted.protocolVersion;
+        session.updatedAt = persisted.updatedAt;
+      }
       console.log(`[Sync] Loaded persisted state for room: ${roomName}`);
     }
   } catch (err) {
@@ -149,12 +197,18 @@ export async function persistRoom(
   const room = connections.get(roomName);
   if (!room || room.length === 0) return;
 
-  const doc = room[0].doc;
+  const session = roomSessions.get(roomName);
+  if (!session) return;
+
+  const doc = session.doc;
   const state = Y.encodeStateAsUpdate(doc);
   const documentSnapshot = extractCanonicalDocument(doc);
 
   try {
     await persistence.store(roomName, {
+      roomId: roomName,
+      protocolVersion: session.protocolVersion,
+      updatedAt: session.updatedAt,
       yjsSnapshot: Buffer.from(state),
       documentSnapshot,
     });

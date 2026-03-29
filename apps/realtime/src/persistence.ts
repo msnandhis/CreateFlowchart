@@ -4,8 +4,12 @@ const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 const SNAPSHOT_PREFIX = "flowchart:snapshot:";
 const DOCUMENT_PREFIX = "flowchart:document:";
 const SNAPSHOT_TTL = 60 * 60 * 24 * 7;
+export const ROOM_PROTOCOL_VERSION = 1;
 
 export interface PersistedRoomState {
+  roomId: string;
+  protocolVersion: number;
+  updatedAt: string;
   yjsSnapshot: Buffer;
   documentSnapshot?: string | null;
 }
@@ -54,7 +58,12 @@ class RedisPersistence implements RoomPersistence {
     if (state.documentSnapshot) {
       multi.set(
         this.documentKey(roomName),
-        state.documentSnapshot,
+        JSON.stringify({
+          roomId: state.roomId,
+          protocolVersion: state.protocolVersion,
+          updatedAt: state.updatedAt,
+          documentSnapshot: state.documentSnapshot,
+        }),
         "EX",
         SNAPSHOT_TTL,
       );
@@ -74,9 +83,22 @@ class RedisPersistence implements RoomPersistence {
     if (!stored) return null;
 
     try {
+      const parsedDocument =
+        documentSnapshot && documentSnapshot.startsWith("{")
+          ? (JSON.parse(documentSnapshot) as {
+              roomId?: string;
+              protocolVersion?: number;
+              updatedAt?: string;
+              documentSnapshot?: string | null;
+            })
+          : null;
+
       return {
+        roomId: parsedDocument?.roomId ?? roomName,
+        protocolVersion: parsedDocument?.protocolVersion ?? ROOM_PROTOCOL_VERSION,
+        updatedAt: parsedDocument?.updatedAt ?? new Date().toISOString(),
         yjsSnapshot: Buffer.from(stored, "base64"),
-        documentSnapshot,
+        documentSnapshot: parsedDocument?.documentSnapshot ?? documentSnapshot,
       };
     } catch {
       return null;

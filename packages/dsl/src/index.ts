@@ -92,10 +92,17 @@ export function documentToMermaid(document: DiagramDocument): string {
       return;
     }
 
-    const label = node.content.title.replace(/"/g, "'");
+    const label = formatMermaidNodeLabel(node);
 
     if (node.kind.includes("start") || node.kind.includes("end")) {
-      lines.push(`    ${node.id}(["${label}"])`);
+      lines.push(
+        document.family === "bpmn" &&
+          (node.kind.includes("timer") ||
+            node.kind.includes("message") ||
+            node.kind.includes("error"))
+          ? `    ${node.id}(("${label}"))`
+          : `    ${node.id}(["${label}"])`,
+      );
     } else if (document.family === "bpmn" && node.kind.includes("parallel")) {
       lines.push(`    ${node.id}{{"${label}"}}`);
     } else if (node.kind.includes("gateway") || node.kind.includes("decision")) {
@@ -788,6 +795,18 @@ export function parseMermaidState(source: string): DiagramDslAst {
   };
 
   for (const line of lines.slice(1)) {
+    const explicitStateMatch = line.match(
+      /^state\s+(?:"(.+)"\s+as\s+)?([A-Za-z0-9_-]+)$/i,
+    );
+    if (explicitStateMatch) {
+      const [, rawLabel, rawId] = explicitStateMatch;
+      const stateNode = ensureState(rawId);
+      if (rawLabel) {
+        stateNode.content.title = rawLabel;
+      }
+      continue;
+    }
+
     const stateBlockMatch = line.match(/^state\s+([A-Za-z0-9_-]+)(?:\s+as\s+(.+))?\s*\{$/);
     if (stateBlockMatch) {
       const [, rawId, rawLabel] = stateBlockMatch;
@@ -917,11 +936,26 @@ function parseMermaidNodeToken(token: string): {
   }
 
   if (body.startsWith("([") && body.endsWith("])")) {
+    const rawLabel = body.slice(2, -2).replace(/^"|"$/g, "");
+    const event = parseBpmnEventLabel(rawLabel);
     return {
-      label: body.slice(2, -2).replace(/^"|"$/g, ""),
-      kind: "start-event",
+      label: event.label,
+      kind: event.kind ?? "start-event",
       shape: "terminator-start",
       size: { width: 180, height: 64 },
+      family: event.family,
+    };
+  }
+
+  if (body.startsWith("((") && body.endsWith("))")) {
+    const rawLabel = body.slice(2, -2).replace(/^"|"$/g, "");
+    const event = parseBpmnEventLabel(rawLabel);
+    return {
+      label: event.label,
+      kind: event.kind ?? "intermediate-event",
+      shape: event.shape ?? "bpmn-intermediate-event",
+      size: { width: 180, height: 64 },
+      family: "bpmn",
     };
   }
 
@@ -962,6 +996,58 @@ function parseMermaidNodeToken(token: string): {
   };
 }
 
+function parseBpmnEventLabel(label: string): {
+  label: string;
+  kind?: string;
+  shape?: string;
+  family?: DiagramDocument["family"];
+} {
+  const trimmed = label.trim();
+
+  if (/^timer:/i.test(trimmed)) {
+    return {
+      label: trimmed.replace(/^timer:\s*/i, ""),
+      kind: "timer-event",
+      shape: "bpmn-timer-event",
+      family: "bpmn",
+    };
+  }
+
+  if (/^message:/i.test(trimmed)) {
+    return {
+      label: trimmed.replace(/^message:\s*/i, ""),
+      kind: "message-event",
+      shape: "bpmn-message-event",
+      family: "bpmn",
+    };
+  }
+
+  if (/^error:/i.test(trimmed)) {
+    return {
+      label: trimmed.replace(/^error:\s*/i, ""),
+      kind: "error-event",
+      shape: "bpmn-error-event",
+      family: "bpmn",
+    };
+  }
+
+  return { label: trimmed };
+}
+
+function formatMermaidNodeLabel(node: DiagramNode): string {
+  const base = node.content.title.replace(/"/g, "'");
+  if (node.kind.includes("timer")) {
+    return `Timer: ${base}`;
+  }
+  if (node.kind.includes("message")) {
+    return `Message: ${base}`;
+  }
+  if (node.kind.includes("error")) {
+    return `Error: ${base}`;
+  }
+  return base;
+}
+
 function documentToMermaidSequence(document: DiagramDocument): string {
   const lines: string[] = ["sequenceDiagram"];
 
@@ -992,7 +1078,13 @@ function documentToMermaidState(document: DiagramDocument): string {
 
     const indent = "    ".repeat(depth);
     if (node.kind !== "terminal-state") {
-      lines.push(`${indent}state ${node.id}`);
+      lines.push(
+        `${indent}${
+          node.content.title !== node.id
+            ? `state "${escapeMermaidText(node.content.title)}" as ${node.id}`
+            : `state ${node.id}`
+        }`,
+      );
     }
     renderedNodes.add(node.id);
   };
@@ -1004,7 +1096,13 @@ function documentToMermaidState(document: DiagramDocument): string {
     }
 
     const indent = "    ".repeat(depth);
-    lines.push(`${indent}state ${container.id} {`);
+    lines.push(
+      `${indent}${
+        container.label !== container.id
+          ? `state "${escapeMermaidText(container.label)}" as ${container.id} {`
+          : `state ${container.id} {`
+      }`,
+    );
     for (const childContainerId of container.childContainerIds) {
       renderContainer(childContainerId, depth + 1);
     }

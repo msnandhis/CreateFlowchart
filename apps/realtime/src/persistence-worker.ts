@@ -1,15 +1,18 @@
 import { Worker, Queue } from "bullmq";
 import Redis from "ioredis";
 import * as Y from "yjs";
+import { ROOM_PROTOCOL_VERSION } from "./persistence";
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 const SNAPSHOT_PREFIX = "flowchart:snapshot:";
+const DOCUMENT_PREFIX = "flowchart:document:";
 const SNAPSHOT_TTL = 60 * 60 * 24 * 7;
 const SNAPSHOT_INTERVAL = 60 * 5;
 
 interface SnapshotJobData {
   roomName: string;
   docState: string;
+  documentSnapshot?: string | null;
 }
 
 class PersistenceWorker {
@@ -39,8 +42,8 @@ class PersistenceWorker {
     this.worker = new Worker<SnapshotJobData>(
       "persistence-snapshots",
       async (job) => {
-        const { roomName, docState } = job.data;
-        await this.storeSnapshot(roomName, docState);
+        const { roomName, docState, documentSnapshot } = job.data;
+        await this.storeSnapshot(roomName, docState, documentSnapshot);
       },
       {
         connection: this.redis.duplicate(),
@@ -78,9 +81,24 @@ class PersistenceWorker {
   private async storeSnapshot(
     roomName: string,
     docState: string,
+    documentSnapshot?: string | null,
   ): Promise<void> {
-    const key = `${SNAPSHOT_PREFIX}${roomName}`;
-    await this.redis.set(key, docState, "EX", SNAPSHOT_TTL);
+    const multi = this.redis.multi();
+    multi.set(`${SNAPSHOT_PREFIX}${roomName}`, docState, "EX", SNAPSHOT_TTL);
+    if (documentSnapshot) {
+      multi.set(
+        `${DOCUMENT_PREFIX}${roomName}`,
+        JSON.stringify({
+          roomId: roomName,
+          protocolVersion: ROOM_PROTOCOL_VERSION,
+          updatedAt: new Date().toISOString(),
+          documentSnapshot,
+        }),
+        "EX",
+        SNAPSHOT_TTL,
+      );
+    }
+    await multi.exec();
     console.log(`[PersistenceWorker] Stored snapshot for room: ${roomName}`);
   }
 
@@ -98,12 +116,14 @@ class PersistenceWorker {
     if (!this.queue) return;
 
     const state = Buffer.from(Y.encodeStateAsUpdate(doc)).toString("base64");
+    const documentSnapshot = doc.getMap<string>("diagram").get("document") ?? null;
 
     this.queue.add(
       `snapshot-${roomName}-${Date.now()}`,
       {
         roomName,
         docState: state,
+        documentSnapshot,
       },
       {
         repeat: {
