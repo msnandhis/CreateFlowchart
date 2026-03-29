@@ -1,9 +1,16 @@
 import type { FlowGraph } from "@createflowchart/core";
 
+export interface GenerateAttachment {
+  type: "image";
+  mimeType?: string;
+  url: string;
+}
+
 export interface GenerateOptions {
   prompt: string;
   context?: FlowGraph;
   systemPrompt?: string;
+  attachments?: GenerateAttachment[];
 }
 
 export interface AIProviderConfig {
@@ -16,6 +23,7 @@ export interface AIProviderConfig {
 export interface AIProvider {
   readonly name: string;
   readonly model: string;
+  readonly supportsAttachments?: boolean;
 
   generate(options: GenerateOptions): Promise<GenerateResponse>;
 }

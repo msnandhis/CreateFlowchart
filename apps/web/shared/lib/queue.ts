@@ -45,6 +45,8 @@ export interface AIGenerationJobData {
   existingFlowGraph?: string; // Serialized FlowGraph JSON
   existingDocument?: string; // Serialized DiagramDocument JSON
   existingDsl?: string; // Serialized native DSL
+  imageUrl?: string;
+  imageMimeType?: string;
 }
 
 export interface ExportRenderJobData {

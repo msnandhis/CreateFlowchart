@@ -7,6 +7,7 @@ const BASE_URL = "https://api.x.ai/v1";
 export class XAIProvider implements AIProvider {
   readonly name = "xAI";
   readonly model: string;
+  readonly supportsAttachments = false;
 
   constructor(
     private apiKey: string,
@@ -17,12 +18,16 @@ export class XAIProvider implements AIProvider {
   }
 
   async generate(options: GenerateOptions): Promise<GenerateResponse> {
-    const { prompt, context } = options;
+    const { prompt, context, systemPrompt, attachments } = options;
+
+    if (attachments?.length) {
+      throw new AIError(this.name, "Image attachments are not supported by this provider");
+    }
 
     const messages: Array<{ role: string; content: string }> = [
       {
         role: "system",
-        content: `You are a flowchart expert. Generate a valid FlowGraph JSON based on the user prompt.
+        content: systemPrompt || `You are a flowchart expert. Generate a valid FlowGraph JSON based on the user prompt.
 The FlowGraph schema:
 - nodes: array of { id, type: "start"|"process"|"decision"|"action"|"end", position: {x, y}, data: { label, confidence: 0-1, meta: {}, action?: { webhook_url, method, headers, payload_template } } }
 - edges: array of { id, source, target, label?: string, confidence?: 0-1 }

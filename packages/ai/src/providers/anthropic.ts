@@ -7,6 +7,7 @@ const BASE_URL = "https://api.anthropic.com/v1";
 export class AnthropicProvider implements AIProvider {
   readonly name = "Anthropic";
   readonly model: string;
+  readonly supportsAttachments = true;
 
   constructor(
     private apiKey: string,
@@ -17,9 +18,9 @@ export class AnthropicProvider implements AIProvider {
   }
 
   async generate(options: GenerateOptions): Promise<GenerateResponse> {
-    const { prompt, context } = options;
+    const { prompt, context, systemPrompt, attachments } = options;
 
-    const systemPrompt = `You are a flowchart expert. Generate a valid FlowGraph JSON based on the user prompt.
+    const fallbackSystemPrompt = `You are a flowchart expert. Generate a valid FlowGraph JSON based on the user prompt.
 The FlowGraph schema:
 - nodes: array of { id, type: "start"|"process"|"decision"|"action"|"end", position: {x, y}, data: { label, confidence: 0-1, meta: {}, action?: { webhook_url, method, headers, payload_template } } }
 - edges: array of { id, source, target, label?: string, confidence?: 0-1 }
@@ -27,7 +28,7 @@ The FlowGraph schema:
 
 Respond ONLY with valid JSON. No markdown, no explanations.`;
 
-    const messages: Array<{ role: string; content: string }> = [];
+    const messages: unknown[] = [];
 
     if (context) {
       messages.push({
@@ -36,9 +37,26 @@ Respond ONLY with valid JSON. No markdown, no explanations.`;
       });
     }
 
+    const userContent: unknown = attachments?.length
+      ? [
+          {
+            type: "text",
+            text: `${prompt}\n\nIMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after.`,
+          },
+          ...attachments.map((attachment) => ({
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: attachment.mimeType || "image/png",
+              data: attachment.url.replace(/^data:[^;]+;base64,/, ""),
+            },
+          })),
+        ]
+      : `${prompt}\n\nIMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after.`;
+
     messages.push({
       role: "user",
-      content: `${prompt}\n\nIMPORTANT: Respond ONLY with valid JSON. Do not include any text before or after.`,
+      content: userContent,
     });
 
     try {
@@ -52,7 +70,7 @@ Respond ONLY with valid JSON. No markdown, no explanations.`;
         body: JSON.stringify({
           model: this.model,
           max_tokens: 4096,
-          system: systemPrompt,
+          system: systemPrompt || fallbackSystemPrompt,
           messages,
         }),
       });

@@ -8,7 +8,6 @@ import {
 } from "../services/ai-service";
 import { useEditorStore } from "@/features/editor/stores/editorStore";
 import { Button } from "@/shared/ui/Button";
-import { Input } from "@/shared/ui/Input";
 import styles from "./ai.module.css";
 
 interface ImproveDiffProps {
@@ -125,28 +124,31 @@ export function ImproveDiff({ onClose }: ImproveDiffProps) {
           <div className={styles.result}>
             <h4 className={styles.diffTitle}>Proposed Changes</h4>
             <div className={styles.changesList}>
-              {result.changes.map((change, idx) => (
+              {[
+                ...result.patch.nodeAdds,
+                ...result.patch.nodeUpdates,
+                ...result.patch.nodeRemovals,
+                ...result.patch.containerAdds,
+                ...result.patch.containerUpdates,
+                ...result.patch.containerRemovals,
+              ].map((change, idx) => (
                 <div key={idx} className={styles.changeItem}>
-                  <span className={styles.changeIcon}>
-                    {change.type === "add"
-                      ? "➕"
-                      : change.type === "remove"
-                        ? "➖"
-                        : "✏️"}
-                  </span>
-                  <span className={styles.changeDesc}>
-                    {change.description}
-                  </span>
+                  <span className={styles.changeIcon}>•</span>
+                  <span className={styles.changeDesc}>{change}</span>
                 </div>
               ))}
             </div>
 
             <div className={styles.diffPreview}>
               <h4>Preview</h4>
+              <p className={styles.nodeCount}>{result.patch.summary}</p>
               <p className={styles.nodeCount}>
                 {Array.isArray((result.document as { nodes?: unknown[] } | undefined)?.nodes)
                   ? (result.document as { nodes: unknown[] }).nodes.length
                   : 0} nodes in improved flow
+              </p>
+              <p className={styles.metaNote}>
+                {result.provenance.provider} · {result.provenance.model} · {Math.round(result.provenance.confidence * 100)}%
               </p>
             </div>
 

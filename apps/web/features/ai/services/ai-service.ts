@@ -1,3 +1,10 @@
+import type {
+  AIDocumentAnalyzeResult,
+  AIDocumentExplainResult,
+  AIDocumentGenerateResult,
+  AIDocumentImproveResult,
+} from "@createflowchart/ai";
+
 export interface AIJobStatus {
   id: string;
   status: "pending" | "processing" | "completed" | "failed";
@@ -9,37 +16,14 @@ export interface AIJobStatus {
 export interface AIGenerateInput {
   prompt: string;
   nodeCount?: number;
+  imageUrl?: string;
+  imageMimeType?: string;
 }
 
-export interface AIAnalyzeResult {
-  score: number;
-  issues: Array<{
-    type: "error" | "warning" | "suggestion";
-    message: string;
-    nodeIds: string[];
-  }>;
-}
-
-export interface AIImproveResult {
-  changes: Array<{
-    type: "add" | "remove" | "modify";
-    description: string;
-    before?: unknown;
-    after?: unknown;
-  }>;
-  document: unknown;
-  dsl: string;
-  legacyFlowGraph?: unknown;
-}
-
-export interface AIExplainResult {
-  summary: string;
-  steps: Array<{
-    nodeId: string;
-    description: string;
-  }>;
-  dsl?: string;
-}
+export type AIGenerateResult = AIDocumentGenerateResult;
+export type AIAnalyzeResult = AIDocumentAnalyzeResult;
+export type AIImproveResult = AIDocumentImproveResult;
+export type AIExplainResult = AIDocumentExplainResult;
 
 export interface JobProgressEvent {
   jobId: string;

@@ -36,3 +36,11 @@ export {
   parseExplainResponse,
   type ExplainReport,
 } from "./prompts/explain";
+export type {
+  AIArtifactProvenance,
+  AIChangePatch,
+  AIDocumentGenerateResult,
+  AIDocumentImproveResult,
+  AIDocumentAnalyzeResult,
+  AIDocumentExplainResult,
+} from "./contracts";

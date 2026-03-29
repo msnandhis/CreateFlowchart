@@ -7,6 +7,7 @@ const BASE_URL = "https://api.openai.com/v1";
 export class OpenAIProvider implements AIProvider {
   readonly name = "OpenAI";
   readonly model: string;
+  readonly supportsAttachments = true;
 
   constructor(
     private apiKey: string,
@@ -17,12 +18,12 @@ export class OpenAIProvider implements AIProvider {
   }
 
   async generate(options: GenerateOptions): Promise<GenerateResponse> {
-    const { prompt, context } = options;
+    const { prompt, context, systemPrompt, attachments } = options;
 
-    const messages: Array<{ role: string; content: string }> = [
+    const messages: Array<{ role: string; content: unknown }> = [
       {
         role: "system",
-        content: `You are a flowchart expert. Generate a valid FlowGraph JSON based on the user prompt.
+        content: systemPrompt || `You are a flowchart expert. Generate a valid FlowGraph JSON based on the user prompt.
 The FlowGraph schema:
 - nodes: array of { id, type: "start"|"process"|"decision"|"action"|"end", position: {x, y}, data: { label, confidence: 0-1, meta: {}, action?: { webhook_url, method, headers, payload_template } } }
 - edges: array of { id, source, target, label?: string, confidence?: 0-1 }
@@ -39,7 +40,18 @@ Respond ONLY with valid JSON. No markdown, no explanations.`,
       });
     }
 
-    messages.push({ role: "user", content: prompt });
+    messages.push({
+      role: "user",
+      content: attachments?.length
+        ? [
+            { type: "text", text: prompt },
+            ...attachments.map((attachment) => ({
+              type: "image_url",
+              image_url: { url: attachment.url },
+            })),
+          ]
+        : prompt,
+    });
 
     try {
       const response = await fetch(`${this.baseUrl}/chat/completions`, {

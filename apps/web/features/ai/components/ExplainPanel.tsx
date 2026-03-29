@@ -83,20 +83,23 @@ export function ExplainPanel({ onClose }: ExplainPanelProps) {
           <div className={styles.result}>
             <div className={styles.summary}>
               <h4>Summary</h4>
-              <p>{result.summary}</p>
+              <p>{result.markdown.split("\n\n")[1] ?? "AI explanation ready."}</p>
             </div>
 
             <div className={styles.stepsList}>
               <h4>Step-by-Step Explanation</h4>
-              {result.steps.map((step, idx) => (
+              {result.nodeWalkthrough.map((step, idx) => (
                 <div key={idx} className={styles.stepItem}>
                   <span className={styles.stepNumber}>{idx + 1}</span>
                   <div className={styles.stepContent}>
                     <span className={styles.stepNode}>Node: {step.nodeId}</span>
-                    <span className={styles.stepDesc}>{step.description}</span>
+                    <span className={styles.stepDesc}>{step.explanation}</span>
                   </div>
                 </div>
               ))}
+            </div>
+            <div className={styles.metaNote}>
+              {result.provenance.provider} · {result.provenance.model} · {Math.round(result.provenance.confidence * 100)}%
             </div>
 
             <div className={styles.actions}>

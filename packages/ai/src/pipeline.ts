@@ -40,6 +40,10 @@ export class AIPipeline {
 
     for (const provider of this.providers) {
       try {
+        if (options.attachments?.length && provider.supportsAttachments === false) {
+          throw new AIError(provider.name, "Provider does not support attachments");
+        }
+
         onProgress?.(`Calling ${provider.name}...`);
 
         const response = await provider.generate(options);
@@ -118,6 +122,10 @@ export class AIPipeline {
 
     for (const provider of this.providers) {
       try {
+        if (options.attachments?.length && provider.supportsAttachments === false) {
+          throw new AIError(provider.name, "Provider does not support attachments");
+        }
+
         onProgress?.(`Calling ${provider.name}...`);
         const response = await provider.generate(options);
         const duration = Date.now() - startTime;

@@ -12,6 +12,12 @@ import {
 } from "../shared/lib/job-events";
 import {
   ANALYZE_SYSTEM_PROMPT,
+  type AIArtifactProvenance,
+  type AIChangePatch,
+  type AIDocumentAnalyzeResult,
+  type AIDocumentExplainResult,
+  type AIDocumentGenerateResult,
+  type AIDocumentImproveResult,
   parseAnalyzeResponse,
   type AnalyzeReport,
   EXPLAIN_SYSTEM_PROMPT,
@@ -19,62 +25,14 @@ import {
   type ExplainReport,
 } from "@createflowchart/ai";
 import { toDiagramDocument } from "../features/editor/lib/document-compat";
-import { documentToFlowGraph } from "../features/editor/lib/document-compat";
-
-export interface GenerateResult {
-  document: DiagramDocument;
-  dsl: string;
-  flow: FlowGraph;
-  provider: string;
-  model: string;
-  confidence: number;
-  nodeConfidences: Record<string, number>;
-  edgeConfidences: Record<string, number>;
-  repairAttempts: number;
-}
-
-export interface AnalyzeResult {
-  issues: {
-    type: "dead_end" | "loop" | "decision" | "depth" | "other";
-    nodeId?: string;
-    message: string;
-    severity: "error" | "warning" | "info";
-  }[];
-  overallHealth: number;
-  suggestions: string[];
-}
-
-export interface ImproveResult {
-  originalDocument: DiagramDocument;
-  originalDsl: string;
-  document: DiagramDocument;
-  dsl: string;
-  legacyFlowGraph: FlowGraph;
-  improvedDocument: DiagramDocument;
-  improvedDsl: string;
-  original: FlowGraph;
-  improved: FlowGraph;
-  changes: {
-    type: "add" | "remove" | "modify";
-    description: string;
-    nodeId?: string;
-  }[];
-  confidence: number;
-}
-
-export interface ExplainResult {
-  markdown: string;
-  dsl?: string;
-  nodeWalkthrough: {
-    nodeId: string;
-    label: string;
-    explanation: string;
-  }[];
-}
 
 export interface AIJobResult {
   success: boolean;
-  data?: GenerateResult | AnalyzeResult | ImproveResult | ExplainResult;
+  data?:
+    | AIDocumentGenerateResult
+    | AIDocumentAnalyzeResult
+    | AIDocumentImproveResult
+    | AIDocumentExplainResult;
   error?: string;
   jobId: string;
   action: "generate" | "analyze" | "improve" | "explain";
@@ -198,7 +156,15 @@ async function emitProgress(
 export async function processAIJob(
   job: Job<AIGenerationJobData>,
 ): Promise<AIJobResult> {
-  const { userId, prompt, action, flowId, existingFlowGraph, existingDocument } = job.data;
+  const {
+    userId,
+    prompt,
+    action,
+    existingFlowGraph,
+    existingDocument,
+    imageUrl,
+    imageMimeType,
+  } = job.data;
   const startedAt = new Date().toISOString();
   const jobId = job.id || "unknown";
 
@@ -213,7 +179,13 @@ export async function processAIJob(
     switch (action) {
       case "generate":
         await emitProgress(jobId, "processing", 20);
-        result = await handleGenerate(userId, sanitizedPrompt, jobId);
+        result = await handleGenerate(
+          userId,
+          sanitizedPrompt,
+          jobId,
+          imageUrl,
+          imageMimeType,
+        );
         break;
       case "analyze":
         await emitProgress(jobId, "processing", 20);
@@ -295,10 +267,18 @@ async function handleGenerate(
   userId: string,
   prompt: string,
   jobId: string,
+  imageUrl?: string,
+  imageMimeType?: string,
 ): Promise<AIJobResult> {
+  const generateMode = imageUrl ? "image" : "prompt";
   const result = await aiPipeline.generateText({
-    prompt: buildGenerateDslPrompt(prompt),
+    prompt: imageUrl
+      ? buildImageGenerateDslPrompt(prompt)
+      : buildGenerateDslPrompt(prompt),
     systemPrompt: DSL_SYSTEM_PROMPT,
+    attachments: imageUrl
+      ? [{ type: "image", url: imageUrl, mimeType: imageMimeType }]
+      : undefined,
   });
 
   if (!result.success || !result.data) {
@@ -313,6 +293,13 @@ async function handleGenerate(
       tags: ["ai-generated"],
     },
   });
+  const provenance = buildProvenance(
+    result.metadata.provider,
+    result.metadata.model,
+    result.metadata.confidence,
+    prompt,
+    imageUrl ? "image-convert" : "generate",
+  );
   const generatedDocument: DiagramDocument = {
     ...document,
     metadata: {
@@ -322,30 +309,26 @@ async function handleGenerate(
       tags: Array.from(new Set([...(document.metadata.tags ?? []), "ai-generated"])),
     },
   };
-  const generatedFlow = {
-    ...documentToFlowGraph(generatedDocument),
-    meta: {
-      ...documentToFlowGraph(generatedDocument).meta,
-      createdBy: userId,
-      isSandbox: true,
-    },
-  };
-  const dsl = documentToFlowDsl(generatedDocument);
+  const annotatedDocument = annotateDocumentWithAI(
+    generatedDocument,
+    provenance,
+    result.metadata.nodeConfidences,
+    result.metadata.edgeConfidences,
+  );
+  const dsl = documentToFlowDsl(annotatedDocument);
 
   return {
     success: true,
     jobId,
     action: "generate",
     data: {
-      document: generatedDocument,
+      document: annotatedDocument,
       dsl,
-      flow: generatedFlow,
-      provider: result.metadata.provider,
-      model: result.metadata.model,
-      confidence: result.metadata.confidence,
+      provenance,
       nodeConfidences: result.metadata.nodeConfidences,
       edgeConfidences: result.metadata.edgeConfidences,
       repairAttempts: result.metadata.repairAttempts,
+      mode: generateMode,
     },
     startedAt: "",
     completedAt: "",
@@ -401,6 +384,13 @@ async function handleAnalyze(
       issues,
       overallHealth: report.overallHealth,
       suggestions: report.suggestions,
+      provenance: buildProvenance(
+        result.metadata.provider,
+        result.metadata.model,
+        result.metadata.confidence,
+        prompt,
+        "analyze",
+      ),
     },
     startedAt: "",
     completedAt: "",
@@ -451,19 +441,20 @@ async function handleImprove(
     layout: originalDocument.layout,
     annotations: originalDocument.annotations,
   });
-  const improvedFlow = {
-    ...documentToFlowGraph(improvedDocument),
-    meta: {
-      ...documentToFlowGraph(improvedDocument).meta,
-      createdBy: userId,
-      isSandbox: true,
-    },
-  };
-  const originalFlow = {
-    ...parsedFlow,
-    meta: { ...parsedFlow.meta, isSandbox: true },
-  };
+  const provenance = buildProvenance(
+    result.metadata.provider,
+    result.metadata.model,
+    result.metadata.confidence,
+    prompt,
+    "improve",
+  );
   const report = buildImproveDiffReport(originalDocument, improvedDocument, prompt);
+  const annotatedImprovedDocument = annotateDocumentWithAI(
+    improvedDocument,
+    provenance,
+    result.metadata.nodeConfidences,
+    result.metadata.edgeConfidences,
+  );
 
   return {
     success: true,
@@ -472,18 +463,10 @@ async function handleImprove(
     data: {
       originalDocument,
       originalDsl,
-      document: improvedDocument,
-      dsl: documentToFlowDsl(improvedDocument),
-      legacyFlowGraph: improvedFlow,
-      improvedDocument,
-      improvedDsl: documentToFlowDsl(improvedDocument),
-      original: originalFlow,
-      improved: improvedFlow,
-      changes: report.changes.map((change) => ({
-        type: change.type,
-        description: change.description,
-        nodeId: change.nodeId || undefined,
-      })),
+      document: annotatedImprovedDocument,
+      dsl: documentToFlowDsl(annotatedImprovedDocument),
+      provenance,
+      patch: report.patch,
       confidence: 0.78,
     },
     startedAt: "",
@@ -533,6 +516,13 @@ async function handleExplain(
     data: {
       markdown,
       dsl: documentToFlowDsl(document),
+      provenance: buildProvenance(
+        result.metadata.provider,
+        result.metadata.model,
+        result.metadata.confidence,
+        explainPrompt,
+        "explain",
+      ),
       nodeWalkthrough: report.nodeWalkthrough.map((node) => ({
         nodeId: node.nodeId,
         label: node.label,
@@ -643,9 +633,85 @@ function buildImproveDiffReport(
       });
   }
 
+  const patch: AIChangePatch = {
+    summary: changes[0]?.description ?? `Refined the diagram for: ${prompt}`,
+    nodeAdds: changes.filter((change) => change.type === "add").map((change) => change.description),
+    nodeRemovals: changes.filter((change) => change.type === "remove").map((change) => change.description),
+    nodeUpdates: changes.filter((change) => change.type === "modify").map((change) => change.description),
+    edgeAdds: [],
+    edgeRemovals: [],
+    edgeUpdates: [],
+    containerAdds: improved.containers
+      .filter((container) => !original.containers.some((entry) => entry.id === container.id))
+      .map((container) => `Add ${container.type} "${container.label}"`),
+    containerRemovals: original.containers
+      .filter((container) => !improved.containers.some((entry) => entry.id === container.id))
+      .map((container) => `Remove ${container.type} "${container.label}"`),
+    containerUpdates: improved.containers
+      .filter((container) => {
+        const previous = original.containers.find((entry) => entry.id === container.id);
+        return previous && previous.label !== container.label;
+      })
+      .map((container) => `Update container "${container.label}"`),
+  };
+
+  return { patch, confidence: 0.78 };
+}
+
+function buildImageGenerateDslPrompt(prompt: string): string {
+  const detail = prompt.trim()
+    ? `Use this instruction together with the image: ${prompt}`
+    : "Convert the attached diagram image into native CreateFlowchart DSL.";
+  return `${detail}\n\nRead the image carefully and reconstruct the process as valid CreateFlowchart DSL. Preserve roles, lanes, decisions, labels, and sequence as faithfully as possible.`;
+}
+
+function buildProvenance(
+  provider: string,
+  model: string,
+  confidence: number,
+  prompt: string,
+  mode: AIArtifactProvenance["mode"],
+): AIArtifactProvenance {
   return {
-    changes,
-    confidence: 0.78,
+    provider,
+    model,
+    confidence,
+    prompt,
+    mode,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function annotateDocumentWithAI(
+  document: DiagramDocument,
+  provenance: AIArtifactProvenance,
+  nodeConfidences: Record<string, number>,
+  edgeConfidences: Record<string, number>,
+): DiagramDocument {
+  return {
+    ...document,
+    metadata: {
+      ...document.metadata,
+      tags: Array.from(new Set([...(document.metadata.tags ?? []), "ai-assisted"])),
+    },
+    nodes: document.nodes.map((node) => ({
+      ...node,
+      ai: {
+        generatedBy: `${provenance.provider}:${provenance.model}`,
+        promptRef: provenance.prompt.slice(0, 240),
+        confidence: nodeConfidences[node.id] ?? provenance.confidence,
+        notes: [provenance.mode],
+      },
+    })),
+    edges: document.edges.map((edge) => ({
+      ...edge,
+      ai: {
+        generatedBy: `${provenance.provider}:${provenance.model}`,
+        promptRef: provenance.prompt.slice(0, 240),
+        confidence: edgeConfidences[edge.id] ?? provenance.confidence,
+        notes: [provenance.mode],
+      },
+    })),
   };
 }
 

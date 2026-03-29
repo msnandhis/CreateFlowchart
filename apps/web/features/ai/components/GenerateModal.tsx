@@ -15,18 +15,26 @@ interface GenerateModalProps {
 }
 
 export function GenerateModal({ open, onClose }: GenerateModalProps) {
+  const [mode, setMode] = useState<"prompt" | "image">("prompt");
   const [prompt, setPrompt] = useState("");
+  const [imageUrl, setImageUrl] = useState("");
   const [nodeCount, setNodeCount] = useState(5);
   const [isGenerating, setIsGenerating] = useState(false);
   const [jobStatus, setJobStatus] = useState<AIJobStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [provenance, setProvenance] = useState<string | null>(null);
 
   const setDocument = useEditorStore((s) => s.setDocument);
   const setTitle = useEditorStore((s) => s.setTitle);
 
   const handleGenerate = async () => {
-    if (!prompt.trim()) {
+    if (mode === "prompt" && !prompt.trim()) {
       setError("Please enter a description");
+      return;
+    }
+
+    if (mode === "image" && !imageUrl.trim()) {
+      setError("Please provide an image URL or data URL");
       return;
     }
 
@@ -34,18 +42,27 @@ export function GenerateModal({ open, onClose }: GenerateModalProps) {
     setError(null);
 
     try {
-      const { jobId } = await aiService.generate({ prompt, nodeCount });
+      const { jobId } = await aiService.generate({
+        prompt,
+        nodeCount,
+        imageUrl: mode === "image" ? imageUrl : undefined,
+      });
 
       const status = await aiService.waitForCompletion(jobId, setJobStatus);
 
       if (status.status === "completed" && status.result) {
         const result = status.result as {
           document?: DiagramDocument;
-          flow?: unknown;
+          provenance?: { provider: string; model: string; confidence: number };
         };
         if (result.document) {
           setDocument(result.document);
           setTitle(result.document.metadata.title);
+        }
+        if (result.provenance) {
+          setProvenance(
+            `${result.provenance.provider} · ${result.provenance.model} · ${Math.round(result.provenance.confidence * 100)}%`,
+          );
         }
         onClose();
         resetForm();
@@ -60,10 +77,13 @@ export function GenerateModal({ open, onClose }: GenerateModalProps) {
   };
 
   const resetForm = () => {
+    setMode("prompt");
     setPrompt("");
+    setImageUrl("");
     setNodeCount(5);
     setJobStatus(null);
     setError(null);
+    setProvenance(null);
   };
 
   const handleClose = () => {
@@ -90,17 +110,51 @@ export function GenerateModal({ open, onClose }: GenerateModalProps) {
           </div>
         ) : (
           <>
+            <div className={styles.modeTabs}>
+              <button
+                type="button"
+                className={`${styles.modeTab} ${mode === "prompt" ? styles.modeTabActive : ""}`}
+                onClick={() => setMode("prompt")}
+              >
+                Prompt
+              </button>
+              <button
+                type="button"
+                className={`${styles.modeTab} ${mode === "image" ? styles.modeTabActive : ""}`}
+                onClick={() => setMode("image")}
+              >
+                Image Convert
+              </button>
+            </div>
             <div className={styles.field}>
               <label className={styles.label}>Description</label>
               <textarea
                 className={styles.textarea}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
-                placeholder="Describe your flowchart, e.g., 'User registration flow with email verification'"
+                placeholder={
+                  mode === "prompt"
+                    ? "Describe your flowchart, e.g., 'User registration flow with email verification'"
+                    : "Optional guidance, e.g., 'Keep swimlanes and preserve decision labels'"
+                }
                 rows={4}
                 disabled={isGenerating}
               />
             </div>
+
+            {mode === "image" ? (
+              <div className={styles.field}>
+                <label className={styles.label}>Image URL or Data URL</label>
+                <textarea
+                  className={styles.textarea}
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  placeholder="https://... or data:image/png;base64,..."
+                  rows={3}
+                  disabled={isGenerating}
+                />
+              </div>
+            ) : null}
 
             <div className={styles.field}>
               <label className={styles.label}>Approximate Node Count</label>
@@ -115,6 +169,7 @@ export function GenerateModal({ open, onClose }: GenerateModalProps) {
             </div>
 
             {error && <div className={styles.error}>{error}</div>}
+            {provenance ? <div className={styles.metaNote}>Last AI run: {provenance}</div> : null}
 
             <div className={styles.actions}>
               <Button
@@ -127,7 +182,7 @@ export function GenerateModal({ open, onClose }: GenerateModalProps) {
               <Button
                 variant="primary"
                 onClick={handleGenerate}
-                disabled={isGenerating || !prompt.trim()}
+                disabled={isGenerating || (mode === "prompt" ? !prompt.trim() : !imageUrl.trim())}
               >
                 {isGenerating ? "Generating..." : "Generate"}
               </Button>

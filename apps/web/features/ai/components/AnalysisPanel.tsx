@@ -43,14 +43,14 @@ export function AnalysisPanel({ onClose }: AnalysisPanelProps) {
     }
   };
 
-  const getIssueIcon = (type: "error" | "warning" | "suggestion") => {
+  const getIssueIcon = (type: "error" | "warning" | "info") => {
     switch (type) {
       case "error":
-        return "❌";
+        return "Error";
       case "warning":
-        return "⚠️";
-      case "suggestion":
-        return "💡";
+        return "Warn";
+      case "info":
+        return "Info";
     }
   };
 
@@ -101,13 +101,13 @@ export function AnalysisPanel({ onClose }: AnalysisPanelProps) {
             <div className={styles.scoreSection}>
               <div
                 className={styles.scoreCircle}
-                style={{ borderColor: getScoreColor(result.score) }}
+                style={{ borderColor: getScoreColor(result.overallHealth) }}
               >
                 <span
                   className={styles.scoreValue}
-                  style={{ color: getScoreColor(result.score) }}
+                  style={{ color: getScoreColor(result.overallHealth) }}
                 >
-                  {Math.round(result.score * 100)}
+                  {Math.round(result.overallHealth * 100)}
                 </span>
                 <span className={styles.scoreLabel}>Score</span>
               </div>
@@ -123,21 +123,24 @@ export function AnalysisPanel({ onClose }: AnalysisPanelProps) {
                 result.issues.map((issue, idx) => (
                   <div key={idx} className={styles.issueItem}>
                     <span className={styles.issueIcon}>
-                      {getIssueIcon(issue.type)}
+                      {getIssueIcon(issue.severity)}
                     </span>
                     <div className={styles.issueContent}>
                       <span className={styles.issueMessage}>
                         {issue.message}
                       </span>
-                      {issue.nodeIds.length > 0 && (
+                      {issue.nodeId && (
                         <span className={styles.issueNodes}>
-                          Affects: {issue.nodeIds.join(", ")}
+                          Affects: {issue.nodeId}
                         </span>
                       )}
                     </div>
                   </div>
                 ))
               )}
+            </div>
+            <div className={styles.metaNote}>
+              {result.provenance.provider} · {result.provenance.model} · {Math.round(result.provenance.confidence * 100)}%
             </div>
 
             <div className={styles.actions}>

@@ -19,19 +19,21 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { prompt, context, nodeCount } = body;
+    const { prompt, imageUrl, imageMimeType } = body;
 
-    if (!prompt || typeof prompt !== "string") {
+    if ((!prompt || typeof prompt !== "string") && !imageUrl) {
       return NextResponse.json(
-        { error: "Prompt is required" },
+        { error: "Prompt or image is required" },
         { status: 400 },
       );
     }
 
     const jobData: AIGenerationJobData = {
       userId: session.user.id,
-      prompt,
+      prompt: typeof prompt === "string" ? prompt : "",
       action: "generate",
+      imageUrl: typeof imageUrl === "string" ? imageUrl : undefined,
+      imageMimeType: typeof imageMimeType === "string" ? imageMimeType : undefined,
     };
 
     const job = await aiGenerationQueue.add("generate", jobData, {
