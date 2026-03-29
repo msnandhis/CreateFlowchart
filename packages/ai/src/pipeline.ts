@@ -19,6 +19,7 @@ export interface PipelineResult<T> {
 }
 
 export interface GenerateResult extends PipelineResult<FlowGraph> {}
+export interface TextResult extends PipelineResult<string> {}
 
 const MAX_REPAIR_ATTEMPTS = 2;
 
@@ -104,6 +105,60 @@ export class AIPipeline {
         nodeConfidences: {},
         edgeConfidences: {},
         repairAttempts,
+      },
+    };
+  }
+
+  async generateText(
+    options: GenerateOptions,
+    onProgress?: (stage: string) => void,
+  ): Promise<TextResult> {
+    const startTime = Date.now();
+    let lastError: AIError | undefined;
+
+    for (const provider of this.providers) {
+      try {
+        onProgress?.(`Calling ${provider.name}...`);
+        const response = await provider.generate(options);
+        const duration = Date.now() - startTime;
+
+        return {
+          success: true,
+          data: response.content,
+          metadata: {
+            provider: provider.name,
+            model: provider.model,
+            duration,
+            confidence: 0.75,
+            nodeConfidences: {},
+            edgeConfidences: {},
+            repairAttempts: 0,
+          },
+        };
+      } catch (err) {
+        if (err instanceof AIError) {
+          lastError = err;
+        } else {
+          lastError = new AIError(
+            this.providers[0]?.name || "Unknown",
+            `Generation failed: ${(err as Error).message}`,
+            err,
+          );
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: lastError,
+      metadata: {
+        provider: this.providers[0]?.name || "None",
+        model: this.providers[0]?.model || "None",
+        duration: Date.now() - startTime,
+        confidence: 0,
+        nodeConfidences: {},
+        edgeConfidences: {},
+        repairAttempts: 0,
       },
     };
   }

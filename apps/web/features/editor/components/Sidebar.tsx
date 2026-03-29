@@ -24,10 +24,12 @@ export function Sidebar() {
   const updateNodeShape = useEditorStore((s) => s.updateNodeShape);
   const updateNodeSize = useEditorStore((s) => s.updateNodeSize);
   const updateNodeAutomation = useEditorStore((s) => s.updateNodeAutomation);
+  const assignNodeContainer = useEditorStore((s) => s.assignNodeContainer);
   const addNode = useEditorStore((s) => s.addNode);
   const addContainer = useEditorStore((s) => s.addContainer);
   const updateContainerLabel = useEditorStore((s) => s.updateContainerLabel);
   const updateContainerSize = useEditorStore((s) => s.updateContainerSize);
+  const containers = useEditorStore((s) => s.document.containers);
   const [showAutomationConfig, setShowAutomationConfig] = useState(false);
 
   const selectedShape = useMemo(
@@ -95,6 +97,30 @@ export function Sidebar() {
               <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
                 {selectedNode.family}
               </div>
+            </div>
+            <div style={{ marginTop: "1rem" }}>
+              <div className={styles.sectionTitle}>Container</div>
+              <select
+                value={
+                  typeof selectedNode.metadata.parentContainerId === "string"
+                    ? selectedNode.metadata.parentContainerId
+                    : ""
+                }
+                onChange={(e) =>
+                  assignNodeContainer(
+                    selectedNode.id,
+                    e.target.value ? e.target.value : null,
+                  )
+                }
+                className={styles.select}
+              >
+                <option value="">No Container</option>
+                {containers.map((container) => (
+                  <option key={container.id} value={container.id}>
+                    {container.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <div style={{ marginTop: "1rem" }}>
               <div className={styles.sectionTitle}>Geometry</div>

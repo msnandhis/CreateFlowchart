@@ -43,6 +43,8 @@ export interface AIGenerationJobData {
   action: "generate" | "analyze" | "improve" | "explain";
   flowId?: string;          // For analyze/improve/explain
   existingFlowGraph?: string; // Serialized FlowGraph JSON
+  existingDocument?: string; // Serialized DiagramDocument JSON
+  existingDsl?: string; // Serialized native DSL
 }
 
 export interface ExportRenderJobData {

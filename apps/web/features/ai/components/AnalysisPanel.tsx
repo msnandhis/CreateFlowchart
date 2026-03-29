@@ -20,14 +20,14 @@ export function AnalysisPanel({ onClose }: AnalysisPanelProps) {
   const [result, setResult] = useState<AIAnalyzeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const flowGraph = useEditorStore((s) => s.flowGraph);
+  const document = useEditorStore((s) => s.document);
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     setError(null);
 
     try {
-      const { jobId } = await aiService.analyze(flowGraph);
+      const { jobId } = await aiService.analyze(document);
 
       const status = await aiService.waitForCompletion(jobId, setJobStatus);
 

@@ -20,14 +20,14 @@ export function ExplainPanel({ onClose }: ExplainPanelProps) {
   const [result, setResult] = useState<AIExplainResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const flowGraph = useEditorStore((s) => s.flowGraph);
+  const document = useEditorStore((s) => s.document);
 
   const handleExplain = async () => {
     setIsExplaining(true);
     setError(null);
 
     try {
-      const { jobId } = await aiService.explain(flowGraph);
+      const { jobId } = await aiService.explain(document);
 
       const status = await aiService.waitForCompletion(jobId, setJobStatus);
 

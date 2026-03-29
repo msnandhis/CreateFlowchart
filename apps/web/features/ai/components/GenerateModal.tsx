@@ -7,6 +7,7 @@ import { Input } from "@/shared/ui/Input";
 import { aiService, type AIJobStatus } from "../services/ai-service";
 import { useEditorStore } from "@/features/editor/stores/editorStore";
 import styles from "./ai.module.css";
+import type { DiagramDocument } from "@createflowchart/schema";
 
 interface GenerateModalProps {
   open: boolean;
@@ -20,8 +21,8 @@ export function GenerateModal({ open, onClose }: GenerateModalProps) {
   const [jobStatus, setJobStatus] = useState<AIJobStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const setFlowGraph = useEditorStore((s) => s.setFlowGraph);
-  const loadFlow = useEditorStore((s) => s.loadFlow);
+  const setDocument = useEditorStore((s) => s.setDocument);
+  const setTitle = useEditorStore((s) => s.setTitle);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -38,8 +39,14 @@ export function GenerateModal({ open, onClose }: GenerateModalProps) {
       const status = await aiService.waitForCompletion(jobId, setJobStatus);
 
       if (status.status === "completed" && status.result) {
-        const flowGraph = status.result as Parameters<typeof loadFlow>[0];
-        loadFlow(flowGraph, null, "sandbox", "Generated Flow");
+        const result = status.result as {
+          document?: DiagramDocument;
+          flow?: unknown;
+        };
+        if (result.document) {
+          setDocument(result.document);
+          setTitle(result.document.metadata.title);
+        }
         onClose();
         resetForm();
       } else if (status.status === "failed") {

@@ -1,6 +1,8 @@
 import type { Job } from "bullmq";
 import { FlowGraphSchema } from "@createflowchart/core";
 import type { FlowGraph } from "@createflowchart/core";
+import type { DiagramDocument } from "@createflowchart/schema";
+import { flowDslToDocument, documentToFlowDsl } from "@createflowchart/dsl";
 import type { AIGenerationJobData } from "../shared/lib/queue";
 import { redis } from "../shared/lib/redis";
 import { aiPipeline } from "../shared/lib/ai-gateway";
@@ -9,20 +11,19 @@ import {
   type JobProgressEvent,
 } from "../shared/lib/job-events";
 import {
-  SYSTEM_PROMPT,
-  buildGeneratePrompt,
   ANALYZE_SYSTEM_PROMPT,
   parseAnalyzeResponse,
   type AnalyzeReport,
-  IMPROVE_SYSTEM_PROMPT,
-  parseImproveResponse,
-  type ImproveReport,
   EXPLAIN_SYSTEM_PROMPT,
   parseExplainResponse,
   type ExplainReport,
 } from "@createflowchart/ai";
+import { toDiagramDocument } from "../features/editor/lib/document-compat";
+import { documentToFlowGraph } from "../features/editor/lib/document-compat";
 
 export interface GenerateResult {
+  document: DiagramDocument;
+  dsl: string;
   flow: FlowGraph;
   provider: string;
   model: string;
@@ -44,6 +45,10 @@ export interface AnalyzeResult {
 }
 
 export interface ImproveResult {
+  originalDocument: DiagramDocument;
+  originalDsl: string;
+  improvedDocument: DiagramDocument;
+  improvedDsl: string;
   original: FlowGraph;
   improved: FlowGraph;
   changes: {
@@ -56,6 +61,7 @@ export interface ImproveResult {
 
 export interface ExplainResult {
   markdown: string;
+  dsl?: string;
   nodeWalkthrough: {
     nodeId: string;
     label: string;
@@ -189,7 +195,7 @@ async function emitProgress(
 export async function processAIJob(
   job: Job<AIGenerationJobData>,
 ): Promise<AIJobResult> {
-  const { userId, prompt, action, flowId, existingFlowGraph } = job.data;
+  const { userId, prompt, action, flowId, existingFlowGraph, existingDocument } = job.data;
   const startedAt = new Date().toISOString();
   const jobId = job.id || "unknown";
 
@@ -212,6 +218,7 @@ export async function processAIJob(
           userId,
           sanitizedPrompt,
           existingFlowGraph,
+          existingDocument,
           jobId,
         );
         break;
@@ -221,12 +228,13 @@ export async function processAIJob(
           userId,
           sanitizedPrompt,
           existingFlowGraph,
+          existingDocument,
           jobId,
         );
         break;
       case "explain":
         await emitProgress(jobId, "processing", 20);
-        result = await handleExplain(userId, existingFlowGraph, jobId);
+        result = await handleExplain(userId, existingFlowGraph, existingDocument, jobId);
         break;
       default:
         throw new Error(`Unknown action: ${action}`);
@@ -259,36 +267,75 @@ export async function processAIJob(
   }
 }
 
+const DSL_SYSTEM_PROMPT = `You are an expert diagram designer.
+Return only native CreateFlowchart DSL.
+Do not return JSON.
+Do not wrap the response in markdown fences.
+Use the format:
+diagram "Title" family flowchart kit core-flowchart
+node ...
+edge ...
+container ...
+automation ...
+
+Prefer flowchart and BPMN-lite shapes from this set:
+terminator-start, process, decision, action-task, terminator-end, document, multi-document, data, database, stored-data, subprocess, predefined-process, manual-input, display, preparation, delay, connector, off-page-connector,
+bpmn-start-event, bpmn-end-event, bpmn-task, bpmn-user-task, bpmn-service-task, bpmn-subprocess, bpmn-exclusive-gateway, bpmn-parallel-gateway, bpmn-inclusive-gateway.
+
+Use containers for pools, lanes, and swimlanes when the workflow has roles, teams, or systems.`;
+
+function buildGenerateDslPrompt(prompt: string): string {
+  return `Create a complete diagram for the following request.\n\n${prompt}\n\nReturn only valid CreateFlowchart DSL.`;
+}
+
 async function handleGenerate(
   userId: string,
   prompt: string,
   jobId: string,
 ): Promise<AIJobResult> {
-  const flowGraph = FlowGraphSchema.parse({
-    nodes: [],
-    edges: [],
-    meta: { version: 1, createdBy: userId, isSandbox: true },
-  });
-
-  const result = await aiPipeline.generate({
-    prompt: buildGeneratePrompt(prompt),
-    systemPrompt: SYSTEM_PROMPT,
+  const result = await aiPipeline.generateText({
+    prompt: buildGenerateDslPrompt(prompt),
+    systemPrompt: DSL_SYSTEM_PROMPT,
   });
 
   if (!result.success || !result.data) {
     throw result.error || new Error("Generation failed");
   }
 
-  const generatedFlow = {
-    ...result.data,
-    meta: { ...result.data.meta, createdBy: userId, isSandbox: true },
+  const document = flowDslToDocument(result.data, {
+    metadata: {
+      title: "Generated Flow",
+      authorId: userId,
+      source: "native",
+      tags: ["ai-generated"],
+    },
+  });
+  const generatedDocument: DiagramDocument = {
+    ...document,
+    metadata: {
+      ...document.metadata,
+      authorId: userId,
+      source: "native",
+      tags: Array.from(new Set([...(document.metadata.tags ?? []), "ai-generated"])),
+    },
   };
+  const generatedFlow = {
+    ...documentToFlowGraph(generatedDocument),
+    meta: {
+      ...documentToFlowGraph(generatedDocument).meta,
+      createdBy: userId,
+      isSandbox: true,
+    },
+  };
+  const dsl = documentToFlowDsl(generatedDocument);
 
   return {
     success: true,
     jobId,
     action: "generate",
     data: {
+      document: generatedDocument,
+      dsl,
       flow: generatedFlow,
       provider: result.metadata.provider,
       model: result.metadata.model,
@@ -307,6 +354,7 @@ async function handleAnalyze(
   userId: string,
   prompt: string,
   existingFlowGraph?: string,
+  existingDocument?: string,
   jobId?: string,
 ): Promise<AIJobResult> {
   if (!existingFlowGraph) {
@@ -321,20 +369,19 @@ async function handleAnalyze(
   }
 
   const analysisPrompt = `Analyze the following flowchart and identify any issues.\n\nUser context: ${prompt}`;
+  const document = parseExistingDocument(existingDocument, parsedFlow, userId);
 
-  const result = await aiPipeline.generate({
-    prompt: analysisPrompt,
+  const result = await aiPipeline.generateText({
+    prompt: `${analysisPrompt}\n\nCurrent DSL:\n${documentToFlowDsl(document)}`,
     context: parsedFlow,
     systemPrompt: ANALYZE_SYSTEM_PROMPT,
   });
 
-  if (!result.success) {
+  if (!result.success || !result.data) {
     throw result.error || new Error("Analysis failed");
   }
 
-  const report: AnalyzeReport = parseAnalyzeResponse(
-    result.data as unknown as string,
-  );
+  const report: AnalyzeReport = parseAnalyzeResponse(result.data);
 
   const issues = report.issues.map((issue) => ({
     type: issue.type as "dead_end" | "loop" | "decision" | "depth" | "other",
@@ -362,6 +409,7 @@ async function handleImprove(
   userId: string,
   prompt: string,
   existingFlowGraph?: string,
+  existingDocument?: string,
   jobId?: string,
 ): Promise<AIJobResult> {
   if (!existingFlowGraph) {
@@ -375,43 +423,62 @@ async function handleImprove(
     throw new Error("Invalid flow graph JSON");
   }
 
-  const improvePrompt = `Improve this flowchart according to the following instructions:\n${prompt}`;
+  const originalDocument = parseExistingDocument(existingDocument, parsedFlow, userId);
+  const originalDsl = documentToFlowDsl(originalDocument);
+  const improvePrompt = `Improve this diagram according to the following instructions:\n${prompt}\n\nCurrent diagram DSL:\n${originalDsl}`;
 
-  const result = await aiPipeline.generate({
+  const result = await aiPipeline.generateText({
     prompt: improvePrompt,
-    context: parsedFlow,
-    systemPrompt: IMPROVE_SYSTEM_PROMPT,
+    systemPrompt: `${DSL_SYSTEM_PROMPT}\nReturn an improved diagram in CreateFlowchart DSL only.`,
   });
 
-  if (!result.success) {
+  if (!result.success || !result.data) {
     throw result.error || new Error("Improvement failed");
   }
 
-  const report: ImproveReport = parseImproveResponse(
-    result.data as unknown as string,
-  );
-  const validatedFlow = FlowGraphSchema.safeParse(report.improved);
-
+  const improvedDocument = flowDslToDocument(result.data, {
+    id: originalDocument.id,
+    metadata: {
+      ...originalDocument.metadata,
+      authorId: userId,
+      title: originalDocument.metadata.title,
+      source: "native",
+    },
+    theme: originalDocument.theme,
+    layout: originalDocument.layout,
+    annotations: originalDocument.annotations,
+  });
+  const improvedFlow = {
+    ...documentToFlowGraph(improvedDocument),
+    meta: {
+      ...documentToFlowGraph(improvedDocument).meta,
+      createdBy: userId,
+      isSandbox: true,
+    },
+  };
   const originalFlow = {
     ...parsedFlow,
     meta: { ...parsedFlow.meta, isSandbox: true },
   };
+  const report = buildImproveDiffReport(originalDocument, improvedDocument, prompt);
 
   return {
     success: true,
     jobId: jobId || "",
     action: "improve",
     data: {
+      originalDocument,
+      originalDsl,
+      improvedDocument,
+      improvedDsl: documentToFlowDsl(improvedDocument),
       original: originalFlow,
-      improved: validatedFlow.success
-        ? validatedFlow.data
-        : (report.improved as FlowGraph),
+      improved: improvedFlow,
       changes: report.changes.map((change) => ({
         type: change.type,
         description: change.description,
         nodeId: change.nodeId || undefined,
       })),
-      confidence: report.confidence,
+      confidence: 0.78,
     },
     startedAt: "",
     completedAt: "",
@@ -422,6 +489,7 @@ async function handleImprove(
 async function handleExplain(
   userId: string,
   existingFlowGraph?: string,
+  existingDocument?: string,
   jobId?: string,
 ): Promise<AIJobResult> {
   if (!existingFlowGraph) {
@@ -437,20 +505,19 @@ async function handleExplain(
 
   const explainPrompt = "Explain how this flowchart works.";
 
-  const result = await aiPipeline.generate({
+  const document = parseExistingDocument(existingDocument, parsedFlow, userId);
+
+  const result = await aiPipeline.generateText({
     prompt: explainPrompt,
     context: parsedFlow,
     systemPrompt: EXPLAIN_SYSTEM_PROMPT,
   });
 
-  if (!result.success) {
+  if (!result.success || !result.data) {
     throw result.error || new Error("Explanation generation failed");
   }
 
-  const report: ExplainReport = parseExplainResponse(
-    result.data as unknown as string,
-  );
-
+  const report: ExplainReport = parseExplainResponse(result.data);
   const markdown = `# Flowchart Explanation\n\n${report.overview}\n\n## Node Walkthrough\n\n${report.nodeWalkthrough.map((node) => `### ${node.label} (${node.type})\n\n${node.explanation}`).join("\n\n")}\n\n## Main Paths\n\n${report.mainPaths.map((path) => `- ${path.description}: ${path.steps.join(" → ")}`).join("\n")}\n\n## Key Insights\n\n${report.keyInsights.map((insight) => `- ${insight}`).join("\n")}`;
 
   return {
@@ -459,6 +526,7 @@ async function handleExplain(
     action: "explain",
     data: {
       markdown,
+      dsl: documentToFlowDsl(document),
       nodeWalkthrough: report.nodeWalkthrough.map((node) => ({
         nodeId: node.nodeId,
         label: node.label,
@@ -512,4 +580,89 @@ export function createAIGatewayWorker() {
   });
 
   return worker;
+}
+
+function buildImproveDiffReport(
+  original: DiagramDocument,
+  improved: DiagramDocument,
+  prompt: string,
+) {
+  const originalNodes = new Map(original.nodes.map((node) => [node.id, node]));
+  const improvedNodes = new Map(improved.nodes.map((node) => [node.id, node]));
+  const changes: Array<{
+    type: "add" | "remove" | "modify";
+    nodeId: string | null;
+    description: string;
+  }> = [];
+
+  for (const node of improved.nodes) {
+    if (!originalNodes.has(node.id)) {
+      changes.push({
+        type: "add",
+        description: `Added node "${node.content.title}"`,
+        nodeId: node.id,
+      });
+      continue;
+    }
+
+    const previous = originalNodes.get(node.id)!;
+    if (
+      previous.content.title !== node.content.title ||
+      previous.shape !== node.shape ||
+      previous.kind !== node.kind
+    ) {
+      changes.push({
+        type: "modify",
+        description: `Updated node "${previous.content.title}"`,
+        nodeId: node.id,
+      });
+    }
+  }
+
+  for (const node of original.nodes) {
+    if (!improvedNodes.has(node.id)) {
+      changes.push({
+        type: "remove",
+        description: `Removed node "${node.content.title}"`,
+        nodeId: node.id,
+      });
+    }
+  }
+
+  if (changes.length === 0) {
+      changes.push({
+        type: "modify",
+        description: `Refined the diagram for: ${prompt}`,
+        nodeId: null,
+      });
+  }
+
+  return {
+    changes,
+    confidence: 0.78,
+  };
+}
+
+function parseExistingDocument(
+  existingDocument: string | undefined,
+  fallbackFlow: FlowGraph,
+  userId: string,
+): DiagramDocument {
+  if (existingDocument) {
+    try {
+      return toDiagramDocument({
+        data: JSON.parse(existingDocument),
+        authorId: userId,
+        title: "Current Flow",
+      });
+    } catch {
+      // fall through
+    }
+  }
+
+  return toDiagramDocument({
+    data: fallbackFlow,
+    authorId: userId,
+    title: "Current Flow",
+  });
 }

@@ -2,6 +2,7 @@ import {
   documentToAst,
   documentToFlowDsl,
   flowDslToDocument,
+  mermaidToDocument,
   parseFlowDsl,
 } from "@createflowchart/dsl";
 import type { DiagramDocument } from "@createflowchart/schema";
@@ -23,4 +24,11 @@ export function inspectDslDocument(source: string) {
 
 export function parseDslAst(source: string) {
   return parseFlowDsl(source);
+}
+
+export function parseMermaidDocument(
+  source: string,
+  base?: Partial<DiagramDocument>,
+): DiagramDocument {
+  return mermaidToDocument(source, base);
 }

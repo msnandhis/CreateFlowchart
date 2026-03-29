@@ -5,8 +5,14 @@ import { Button } from "@/shared/ui/Button";
 import styles from "../styles/toolbar.module.css";
 import { useLayout } from "../hooks/use-layout";
 
+export type EditorSurfaceMode = "canvas" | "split" | "code";
 
-export function Toolbar() {
+interface ToolbarProps {
+  surfaceMode: EditorSurfaceMode;
+  onSurfaceModeChange: (mode: EditorSurfaceMode) => void;
+}
+
+export function Toolbar({ surfaceMode, onSurfaceModeChange }: ToolbarProps) {
   const title = useEditorStore((s) => s.title);
   const setTitle = useEditorStore((s) => s.setTitle);
   const undo = useEditorStore((s) => s.undo);
@@ -49,6 +55,23 @@ export function Toolbar() {
         <Button variant="ghost" size="sm" title="AI Generate (/)">
           <SparklesIcon />
         </Button>
+      </div>
+
+      <div className={styles.separator} />
+
+      <div className={styles.surfaceModes}>
+        {(["canvas", "split", "code"] as const).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            className={`${styles.surfaceButton} ${
+              surfaceMode === mode ? styles.surfaceButtonActive : ""
+            }`}
+            onClick={() => onSurfaceModeChange(mode)}
+          >
+            {mode === "canvas" ? "Canvas" : mode === "split" ? "Split" : "Code"}
+          </button>
+        ))}
       </div>
 
 

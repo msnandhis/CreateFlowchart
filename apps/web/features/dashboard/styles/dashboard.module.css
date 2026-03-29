@@ -159,3 +159,58 @@
   margin-bottom: var(--space-4);
   color: var(--color-text-muted);
 }
+
+.importModal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.importSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.importLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.importLabel {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.importSelect,
+.jsonTextarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  padding: var(--space-3);
+  font-size: var(--font-size-sm);
+}
+
+.jsonTextarea {
+  resize: vertical;
+  min-height: 220px;
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  line-height: 1.5;
+}
+
+.importError {
+  color: var(--color-danger, #f87171);
+  font-size: var(--font-size-sm);
+}
+
+.importActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

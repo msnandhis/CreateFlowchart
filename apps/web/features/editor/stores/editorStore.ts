@@ -14,11 +14,13 @@ import { addEdge, applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import {
   addLegacyNode,
   addDocumentContainerEntity,
+  assignNodeToContainer,
   applyReactFlowProjection,
   createEditorProjection,
   deleteSelectedEntities,
   projectEngineState,
   redoEditor,
+  replaceEditorDocument,
   selectContainerInEngine,
   selectEdgeInEngine,
   selectNodeInEngine,
@@ -49,6 +51,7 @@ interface EditorState {
   selectedEdgeId: string | null;
   selectedContainerId: string | null;
   setFlowGraph: (fg: FlowGraph) => void;
+  setDocument: (document: DiagramDocument) => void;
   loadFlow: (
     fg: FlowGraph,
     id: string | null,
@@ -77,6 +80,7 @@ interface EditorState {
     id: string,
     size: { width: number; height: number },
   ) => void;
+  assignNodeContainer: (nodeId: string, containerId: string | null) => void;
   updateNodeAutomation: (id: string, config: ActionConfig | undefined) => void;
   undo: () => void;
   redo: () => void;
@@ -134,6 +138,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setFlowGraph: (fg) => {
     set((s) => syncFromFlowGraph(fg, s.title));
+  },
+
+  setDocument: (document) => {
+    set((s) => ({
+      title: document.metadata.title,
+      ...syncFromProjection(replaceEditorDocument(s.engineState, document)),
+    }));
   },
 
   loadFlow: (fg, id, mode, title) => {
@@ -310,6 +321,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     );
   },
 
+  assignNodeContainer: (nodeId, containerId) => {
+    set((s) =>
+      syncFromProjection(assignNodeToContainer(s.engineState, nodeId, containerId)),
+    );
+  },
+
   updateNodeAutomation: (id, config) => {
     set((s) =>
       syncFromProjection(
@@ -354,6 +371,7 @@ export const useSelectedDocumentContainer = () => {
   const document = useEditorStore((s) => s.document);
   return id ? document.containers.find((container) => container.id === id) ?? null : null;
 };
+export const useDocument = () => useEditorStore((s) => s.document);
 export const useSelectedNode = () => {
   const id = useEditorStore((s) => s.selectedNodeId);
   const fg = useEditorStore((s) => s.flowGraph);

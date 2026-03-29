@@ -13,7 +13,14 @@ import {
 
 interface CommandMenuProps extends Omit<
   UseCommandMenuOptions,
-  "onAddNode" | "onAddContainer" | "canUndo" | "canRedo"
+  | "onAddNode"
+  | "onAddContainer"
+  | "onGenerate"
+  | "onAnalyze"
+  | "onExport"
+  | "onImport"
+  | "canUndo"
+  | "canRedo"
 > {
   onOpenGenerate?: () => void;
   onOpenAnalyze?: () => void;

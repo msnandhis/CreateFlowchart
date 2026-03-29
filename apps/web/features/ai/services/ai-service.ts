@@ -28,6 +28,8 @@ export interface AIImproveResult {
     after?: unknown;
   }>;
   newFlowGraph: unknown;
+  improvedDocument?: unknown;
+  improvedDsl?: string;
 }
 
 export interface AIExplainResult {
@@ -36,6 +38,7 @@ export interface AIExplainResult {
     nodeId: string;
     description: string;
   }>;
+  dsl?: string;
 }
 
 export interface JobProgressEvent {
@@ -45,6 +48,12 @@ export interface JobProgressEvent {
   result?: unknown;
   error?: string;
   timestamp: string;
+}
+
+interface AIWorkerEnvelope {
+  success?: boolean;
+  data?: unknown;
+  error?: string;
 }
 
 type StatusListener = (status: AIJobStatus) => void;
@@ -92,8 +101,8 @@ class AIService {
           id: data.jobId,
           status: data.status,
           progress: data.progress,
-          result: data.result,
-          error: data.error,
+          result: unwrapWorkerResult(data.result),
+          error: data.error ?? extractWorkerError(data.result),
         };
         this.setJobStatus(jobId, status);
         onStatus(status);
@@ -147,10 +156,10 @@ class AIService {
     return { jobId: data.jobId };
   }
 
-  async analyze(flowGraph: unknown): Promise<{ jobId: string }> {
+  async analyze(document: unknown): Promise<{ jobId: string }> {
     const response = await this.fetchWithAuth("/api/ai/analyze", {
       method: "POST",
-      body: JSON.stringify({ flowGraph }),
+      body: JSON.stringify({ document }),
     });
 
     if (!response.ok) {
@@ -165,13 +174,10 @@ class AIService {
     return { jobId: data.jobId };
   }
 
-  async improve(
-    flowGraph: unknown,
-    instruction: string,
-  ): Promise<{ jobId: string }> {
+  async improve(document: unknown, instruction: string): Promise<{ jobId: string }> {
     const response = await this.fetchWithAuth("/api/ai/improve", {
       method: "POST",
-      body: JSON.stringify({ flowGraph, instruction }),
+      body: JSON.stringify({ document, instruction }),
     });
 
     if (!response.ok) {
@@ -186,10 +192,10 @@ class AIService {
     return { jobId: data.jobId };
   }
 
-  async explain(flowGraph: unknown): Promise<{ jobId: string }> {
+  async explain(document: unknown): Promise<{ jobId: string }> {
     const response = await this.fetchWithAuth("/api/ai/explain", {
       method: "POST",
-      body: JSON.stringify({ flowGraph }),
+      body: JSON.stringify({ document }),
     });
 
     if (!response.ok) {
@@ -248,10 +254,18 @@ class AIService {
         const response = await this.fetchWithAuth(`/api/ai/status/${jobId}`);
         if (response.ok) {
           const status: AIJobStatus = await response.json();
-          this.setJobStatus(jobId, status);
-          onStatus(status);
+          const normalizedStatus: AIJobStatus = {
+            ...status,
+            result: unwrapWorkerResult(status.result),
+            error: status.error ?? extractWorkerError(status.result),
+          };
+          this.setJobStatus(jobId, normalizedStatus);
+          onStatus(normalizedStatus);
 
-          if (status.status === "completed" || status.status === "failed") {
+          if (
+            normalizedStatus.status === "completed" ||
+            normalizedStatus.status === "failed"
+          ) {
             this.stopPolling(jobId);
           }
         }
@@ -312,3 +326,29 @@ class AIService {
 
 export const aiService = new AIService();
 export { AIServiceError };
+
+function unwrapWorkerResult(result: unknown): unknown {
+  if (
+    typeof result === "object" &&
+    result !== null &&
+    "data" in result &&
+    ("success" in result || "action" in result)
+  ) {
+    return (result as AIWorkerEnvelope).data;
+  }
+
+  return result;
+}
+
+function extractWorkerError(result: unknown): string | undefined {
+  if (
+    typeof result === "object" &&
+    result !== null &&
+    "error" in result &&
+    typeof (result as { error?: unknown }).error === "string"
+  ) {
+    return (result as { error: string }).error;
+  }
+
+  return undefined;
+}

@@ -32,14 +32,14 @@ export default function DashboardPage() {
 
   const handleImport = async ({
     title,
-    flowGraph,
+    document,
   }: {
     title: string;
-    flowGraph: unknown;
+    document: unknown;
   }) => {
     const newFlow = await api.post<{ id: string }>("/api/flows", {
       title,
-      data: flowGraph,
+      document,
     });
     queryClient.invalidateQueries({ queryKey: ["flows"] });
     toast("Flowchart imported!", "success");

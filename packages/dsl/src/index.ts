@@ -65,6 +65,13 @@ export function flowDslToDocument(
   return astToDocument(parseFlowDsl(source), base);
 }
 
+export function mermaidToDocument(
+  source: string,
+  base?: Partial<DiagramDocument>,
+): DiagramDocument {
+  return astToDocument(parseMermaidFlowchart(source), base);
+}
+
 export function printFlowDsl(ast: DiagramDslAst): string {
   const lines: string[] = [
     `diagram "${escapeString(ast.title)}" family ${ast.family} kit ${ast.kit}`,
@@ -303,6 +310,101 @@ export function parseFlowDsl(source: string): DiagramDslAst {
   };
 }
 
+export function parseMermaidFlowchart(source: string): DiagramDslAst {
+  const lines = source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.startsWith("%%"));
+
+  const firstLine = lines[0] ?? "";
+  const directionMatch = firstLine.match(/(?:flowchart|graph)\s+([A-Z]{2})/i);
+  const direction = directionMatch?.[1] ?? "TD";
+  const nodes = new Map<string, DiagramNode>();
+  const edges: DiagramEdge[] = [];
+
+  const ensureNode = (nodeId: string, token?: string) => {
+    if (nodes.has(nodeId)) {
+      return nodes.get(nodeId)!;
+    }
+
+    const parsed = parseMermaidNodeToken(token ?? nodeId);
+    const index = nodes.size;
+    const x = direction === "LR" || direction === "RL" ? index * 260 : 120;
+    const y = direction === "LR" || direction === "RL" ? 120 : index * 140;
+
+    const node: DiagramNode = {
+      id: nodeId,
+      family: "flowchart",
+      kind: parsed.kind,
+      shape: parsed.shape,
+      position: { x, y },
+      size: parsed.size,
+      ports: [],
+      content: {
+        title: parsed.label,
+        labels: [],
+      },
+      style: { tokens: {} },
+      resizePolicy: "content",
+      metadata: {
+        family: "flowchart",
+        semanticKind: parsed.kind,
+        shapeId: parsed.shape,
+      },
+    };
+
+    nodes.set(nodeId, node);
+    return node;
+  };
+
+  for (const line of lines.slice(1)) {
+    const edgeMatch = line.match(
+      /^([A-Za-z0-9_-]+(?:[\[\(\{\/].*?)?)\s*-->\s*(?:\|([^|]+)\|\s*)?([A-Za-z0-9_-]+(?:[\[\(\{\/].*)?)$/,
+    );
+
+    if (edgeMatch) {
+      const [, rawSource, edgeLabel, rawTarget] = edgeMatch;
+      const sourceToken = rawSource.trim();
+      const targetToken = rawTarget.trim();
+      const sourceId = extractNodeId(sourceToken);
+      const targetId = extractNodeId(targetToken);
+
+      ensureNode(sourceId, sourceToken);
+      ensureNode(targetId, targetToken);
+
+      edges.push({
+        id: `edge_${sourceId}_${targetId}_${edges.length + 1}`,
+        family: "flowchart",
+        kind: edgeLabel ? "conditional-flow" : "flow",
+        sourceNodeId: sourceId,
+        targetNodeId: targetId,
+        routing: "orthogonal",
+        waypoints: [],
+        labels: edgeLabel
+          ? [{ text: edgeLabel.trim(), position: "center" }]
+          : [],
+        startMarker: "none",
+        endMarker: "arrow",
+        style: { tokens: {} },
+        metadata: {},
+      });
+      continue;
+    }
+
+    const nodeId = extractNodeId(line);
+    ensureNode(nodeId, line);
+  }
+
+  return {
+    family: "flowchart",
+    kit: "core-flowchart",
+    title: "Imported Mermaid Diagram",
+    nodes: Array.from(nodes.values()),
+    edges,
+    containers: [],
+  };
+}
+
 function tokenize(line: string): string[] {
   const matches = line.match(/"([^"\\]*(?:\\.[^"\\]*)*)"|[^\s]+/g) ?? [];
   return matches.map((token) => token.trim());
@@ -322,4 +424,62 @@ function escapeString(value: string): string {
 
 function formatNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function extractNodeId(token: string): string {
+  const match = token.match(/^([A-Za-z0-9_-]+)/);
+  return match?.[1] ?? token.replace(/[^\w-]/g, "");
+}
+
+function parseMermaidNodeToken(token: string): {
+  label: string;
+  kind: string;
+  shape: string;
+  size: { width: number; height: number };
+} {
+  const id = extractNodeId(token);
+  const body = token.slice(id.length);
+
+  if (body.startsWith("{") && body.endsWith("}")) {
+    return {
+      label: body.slice(1, -1).replace(/^"|"$/g, ""),
+      kind: "decision-gateway",
+      shape: "decision",
+      size: { width: 180, height: 120 },
+    };
+  }
+
+  if (body.startsWith("([") && body.endsWith("])")) {
+    return {
+      label: body.slice(2, -2).replace(/^"|"$/g, ""),
+      kind: "start-event",
+      shape: "terminator-start",
+      size: { width: 180, height: 64 },
+    };
+  }
+
+  if (body.startsWith("[/") && body.endsWith("/]")) {
+    return {
+      label: body.slice(2, -2).replace(/^"|"$/g, ""),
+      kind: "automation-task",
+      shape: "action-task",
+      size: { width: 180, height: 64 },
+    };
+  }
+
+  if (body.startsWith("[") && body.endsWith("]")) {
+    return {
+      label: body.slice(1, -1).replace(/^"|"$/g, ""),
+      kind: "process-step",
+      shape: "process",
+      size: { width: 180, height: 64 },
+    };
+  }
+
+  return {
+    label: id,
+    kind: "process-step",
+    shape: "process",
+    size: { width: 180, height: 64 },
+  };
 }

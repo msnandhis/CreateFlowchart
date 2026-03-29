@@ -36,12 +36,12 @@ export function FlowList() {
 
   const handleImport = async ({
     title,
-    flowGraph,
+    document,
   }: {
     title: string;
-    flowGraph: unknown;
+    document: unknown;
   }) => {
-    await api.post("/api/flows", { title, data: flowGraph });
+    await api.post("/api/flows", { title, document });
     queryClient.invalidateQueries({ queryKey: ["flows"] });
     setImportOpen(false);
   };

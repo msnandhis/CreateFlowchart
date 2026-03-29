@@ -7,6 +7,7 @@ import {
   type AIGenerationJobData,
 } from "@/shared/lib/queue";
 import { headers } from "next/headers";
+import { documentToFlowGraph, toDiagramDocument } from "@/features/editor/lib/document-compat";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,20 +20,26 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { flowGraph } = body;
+    const { flowGraph, document } = body;
 
-    if (!flowGraph) {
+    if (!flowGraph && !document) {
       return NextResponse.json(
-        { error: "FlowGraph is required" },
+        { error: "Document is required" },
         { status: 400 },
       );
     }
+
+    const canonicalDocument = document
+      ? toDiagramDocument({ data: document, title: "AI Explain" })
+      : toDiagramDocument({ data: flowGraph, title: "AI Explain" });
+    const legacyFlowGraph = documentToFlowGraph(canonicalDocument);
 
     const jobData: AIGenerationJobData = {
       userId: session.user.id,
       prompt: "",
       action: "explain",
-      existingFlowGraph: JSON.stringify(flowGraph),
+      existingDocument: JSON.stringify(canonicalDocument),
+      existingFlowGraph: JSON.stringify(legacyFlowGraph),
     };
 
     const job = await aiGenerationQueue.add("explain", jobData, {

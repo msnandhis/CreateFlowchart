@@ -4,8 +4,9 @@ import { Toolbar } from "./Toolbar";
 import { Canvas } from "./Canvas";
 import { Sidebar } from "./Sidebar";
 import { CommandMenu } from "./CommandMenu";
+import { CodePanel } from "./CodePanel";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useEditorStore } from "../stores/editorStore";
 import { useYjs } from "../hooks/use-yjs";
 import { useAutosave } from "../hooks/use-autosave";
@@ -29,6 +30,9 @@ export function EditorShell({
 }: EditorShellProps) {
   const setInitialData = useEditorStore((s) => s.setInitialData);
   const { runLayout } = useAutoLayout();
+  const [surfaceMode, setSurfaceMode] = useState<"canvas" | "split" | "code">(
+    "split",
+  );
 
   const { provider, updateLocalCursor } = useYjs(initialData?.id);
 
@@ -52,18 +56,24 @@ export function EditorShell({
         background: "#0a0a0a",
       }}
     >
-      <Toolbar />
+      <Toolbar
+        surfaceMode={surfaceMode}
+        onSurfaceModeChange={setSurfaceMode}
+      />
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        <main style={{ flex: 1, position: "relative" }}>
-          <Canvas provider={provider} updateLocalCursor={updateLocalCursor} />
-        </main>
+        {surfaceMode !== "code" ? (
+          <main style={{ flex: 1, position: "relative" }}>
+            <Canvas provider={provider} updateLocalCursor={updateLocalCursor} />
+          </main>
+        ) : null}
+        {surfaceMode !== "canvas" ? <CodePanel /> : null}
         <Sidebar />
       </div>
       <CommandMenu
-        onGenerate={onOpenGenerate ?? (() => {})}
-        onAnalyze={onOpenAnalyze ?? (() => {})}
-        onExport={onOpenExport ?? (() => {})}
-        onImport={onOpenImport ?? (() => {})}
+        onOpenGenerate={onOpenGenerate ?? (() => {})}
+        onOpenAnalyze={onOpenAnalyze ?? (() => {})}
+        onOpenExport={onOpenExport ?? (() => {})}
+        onOpenImport={onOpenImport ?? (() => {})}
         onAutoLayout={runLayout}
         onSave={() => {}}
         onUndo={() => useEditorStore.getState().undo()}

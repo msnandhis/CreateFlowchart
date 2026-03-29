@@ -5,15 +5,25 @@ import { Modal } from "@/shared/ui/Modal";
 import { Button } from "@/shared/ui/Button";
 import { Input } from "@/shared/ui/Input";
 import styles from "../styles/dashboard.module.css";
+import {
+  parseDslDocument,
+  parseMermaidDocument,
+} from "@/features/editor/lib/document-codec";
+import {
+  isDiagramDocument,
+  toDiagramDocument,
+} from "@/features/editor/lib/document-compat";
+import type { DiagramDocument } from "@createflowchart/schema";
 
 interface ImportModalProps {
   open: boolean;
   onClose: () => void;
-  onImport: (data: { title: string; flowGraph: unknown }) => void;
+  onImport: (data: { title: string; document: DiagramDocument }) => void;
 }
 
 export function ImportModal({ open, onClose, onImport }: ImportModalProps) {
   const [title, setTitle] = useState("");
+  const [format, setFormat] = useState<"json" | "dsl" | "mermaid">("json");
   const [jsonContent, setJsonContent] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,12 +45,9 @@ export function ImportModal({ open, onClose, onImport }: ImportModalProps) {
       }
 
       try {
-        const parsed = JSON.parse(content);
-        if (!parsed.nodes || !parsed.edges) {
-          setError("Invalid FlowGraph: missing nodes or edges");
-        }
+        validateImportContent(content, format, title);
       } catch {
-        setError("Invalid JSON format");
+        setError("Invalid content format");
       }
     };
     reader.readAsText(file);
@@ -52,12 +59,9 @@ export function ImportModal({ open, onClose, onImport }: ImportModalProps) {
     setError(null);
 
     try {
-      const parsed = JSON.parse(content);
-      if (!parsed.nodes || !parsed.edges) {
-        setError("Invalid FlowGraph: missing nodes or edges");
-      }
+      validateImportContent(content, format, title);
     } catch {
-      setError("Invalid JSON format");
+      setError("Invalid content format");
     }
   };
 
@@ -71,15 +75,11 @@ export function ImportModal({ open, onClose, onImport }: ImportModalProps) {
     setError(null);
 
     try {
-      const flowGraph = JSON.parse(jsonContent);
-      if (!flowGraph.nodes || !flowGraph.edges) {
-        throw new Error("Missing nodes or edges");
-      }
-
-      onImport({ title: title.trim(), flowGraph });
+      const document = parseImportedDocument(jsonContent, format, title.trim());
+      onImport({ title: title.trim(), document });
       handleClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to parse JSON");
+      setError(err instanceof Error ? err.message : "Failed to import content");
     } finally {
       setIsLoading(false);
     }
@@ -87,6 +87,7 @@ export function ImportModal({ open, onClose, onImport }: ImportModalProps) {
 
   const handleClose = () => {
     setTitle("");
+    setFormat("json");
     setJsonContent("");
     setError(null);
     onClose();
@@ -105,12 +106,35 @@ export function ImportModal({ open, onClose, onImport }: ImportModalProps) {
         </div>
 
         <div className={styles.importSection}>
+          <label className={styles.importLabel}>Format</label>
+          <select
+            value={format}
+            onChange={(e) => {
+              const nextFormat = e.target.value as typeof format;
+              setFormat(nextFormat);
+              setError(null);
+            }}
+            className={styles.importSelect}
+          >
+            <option value="json">JSON</option>
+            <option value="dsl">Native DSL</option>
+            <option value="mermaid">Mermaid</option>
+          </select>
+        </div>
+
+        <div className={styles.importSection}>
           <div className={styles.importLabelRow}>
-            <label className={styles.importLabel}>FlowGraph JSON</label>
+            <label className={styles.importLabel}>
+              {format === "json"
+                ? "Diagram JSON"
+                : format === "dsl"
+                  ? "Native DSL"
+                  : "Mermaid"}
+            </label>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".json"
+              accept={format === "json" ? ".json" : ".txt,.mmd,.md"}
               onChange={handleFileChange}
               style={{ display: "none" }}
             />
@@ -126,7 +150,13 @@ export function ImportModal({ open, onClose, onImport }: ImportModalProps) {
             className={styles.jsonTextarea}
             value={jsonContent}
             onChange={handlePaste}
-            placeholder='{"nodes": [...], "edges": [...], "meta": {...}}'
+            placeholder={
+              format === "json"
+                ? '{"nodes": [...], "edges": [...], "meta": {...}}'
+                : format === "dsl"
+                  ? 'diagram "Checkout Flow" family flowchart kit core-flowchart'
+                  : "flowchart TD\n    start([Start]) --> step[Review]"
+            }
             rows={10}
           />
         </div>
@@ -148,4 +178,55 @@ export function ImportModal({ open, onClose, onImport }: ImportModalProps) {
       </div>
     </Modal>
   );
+}
+
+function validateImportContent(
+  content: string,
+  format: "json" | "dsl" | "mermaid",
+  title: string,
+) {
+  parseImportedDocument(content, format, title || "Imported Diagram");
+}
+
+function parseImportedDocument(
+  content: string,
+  format: "json" | "dsl" | "mermaid",
+  title: string,
+): DiagramDocument {
+  if (format === "dsl") {
+    return parseDslDocument(content, {
+      metadata: {
+        title,
+        source: "native",
+        tags: [],
+      },
+    });
+  }
+
+  if (format === "mermaid") {
+    return parseMermaidDocument(content, {
+      metadata: {
+        title,
+        source: "mermaid",
+        tags: [],
+      },
+    });
+  }
+
+  const parsed = JSON.parse(content);
+
+  if (isDiagramDocument(parsed)) {
+    return {
+      ...parsed,
+      metadata: {
+        ...parsed.metadata,
+        title: title || parsed.metadata.title,
+      },
+    };
+  }
+
+  return toDiagramDocument({
+    title,
+    data: parsed,
+  });
 }

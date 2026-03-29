@@ -22,8 +22,8 @@ export function ImproveDiff({ onClose }: ImproveDiffProps) {
   const [result, setResult] = useState<AIImproveResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const flowGraph = useEditorStore((s) => s.flowGraph);
-  const loadFlow = useEditorStore((s) => s.loadFlow);
+  const document = useEditorStore((s) => s.document);
+  const setDocument = useEditorStore((s) => s.setDocument);
 
   const handleImprove = async () => {
     if (!instruction.trim()) {
@@ -35,7 +35,7 @@ export function ImproveDiff({ onClose }: ImproveDiffProps) {
     setError(null);
 
     try {
-      const { jobId } = await aiService.improve(flowGraph, instruction);
+      const { jobId } = await aiService.improve(document, instruction);
 
       const status = await aiService.waitForCompletion(jobId, setJobStatus);
 
@@ -52,13 +52,8 @@ export function ImproveDiff({ onClose }: ImproveDiffProps) {
   };
 
   const handleApply = () => {
-    if (result?.newFlowGraph) {
-      loadFlow(
-        result.newFlowGraph as Parameters<typeof loadFlow>[0],
-        null,
-        "sandbox",
-        "Improved Flow",
-      );
+    if (result?.improvedDocument) {
+      setDocument(result.improvedDocument as typeof document);
       onClose();
     }
   };
@@ -149,10 +144,9 @@ export function ImproveDiff({ onClose }: ImproveDiffProps) {
             <div className={styles.diffPreview}>
               <h4>Preview</h4>
               <p className={styles.nodeCount}>
-                {Array.isArray(result.newFlowGraph)
-                  ? result.newFlowGraph.length
-                  : 0}{" "}
-                nodes in improved flow
+                {Array.isArray((result.improvedDocument as { nodes?: unknown[] } | undefined)?.nodes)
+                  ? (result.improvedDocument as { nodes: unknown[] }).nodes.length
+                  : 0} nodes in improved flow
               </p>
             </div>
 

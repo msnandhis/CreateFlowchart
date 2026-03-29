@@ -15,6 +15,7 @@ import {
   undo as undoDocumentHistory,
   updateContainer as updateDocumentContainer,
   updateNode as updateDocumentNode,
+  replaceDocument as replaceEngineDocument,
   type EngineSelection,
   type EngineState,
 } from "@createflowchart/engine";
@@ -201,6 +202,13 @@ export function addDocumentContainerEntity(
   return projectEngineState(addDocumentContainer(engineState, container));
 }
 
+export function replaceEditorDocument(
+  engineState: EngineState,
+  document: DiagramDocument,
+): EditorProjection {
+  return projectEngineState(replaceEngineDocument(engineState, document));
+}
+
 export function updateDocumentNodeTitle(
   engineState: EngineState,
   nodeId: string,
@@ -368,6 +376,73 @@ export function updateDocumentContainerSize(
       size,
     })),
   );
+}
+
+export function assignNodeToContainer(
+  engineState: EngineState,
+  nodeId: string,
+  containerId: string | null,
+): EditorProjection {
+  let nextState = updateDocumentNode(engineState, nodeId, (node) => ({
+    ...node,
+    metadata: {
+      ...node.metadata,
+      parentContainerId: containerId ?? null,
+    },
+  }));
+
+  const touchedContainerIds = new Set(
+    nextState.document.containers
+      .filter((container) =>
+        container.childNodeIds.includes(nodeId) || container.id === containerId,
+      )
+      .map((container) => container.id),
+  );
+
+  for (const currentContainerId of touchedContainerIds) {
+    nextState = updateDocumentContainer(nextState, currentContainerId, (container) => {
+      const withoutNode = container.childNodeIds.filter((id) => id !== nodeId);
+      const childNodeIds =
+        currentContainerId === containerId
+          ? Array.from(new Set([...withoutNode, nodeId]))
+          : withoutNode;
+
+      return {
+        ...container,
+        childNodeIds,
+      };
+    });
+  }
+
+  if (containerId) {
+    const assignedContainer = nextState.document.containers.find(
+      (container) => container.id === containerId,
+    );
+
+    if (assignedContainer) {
+      nextState = updateDocumentNode(nextState, nodeId, (node) => ({
+        ...node,
+        position: {
+          x: Math.max(
+            assignedContainer.position.x + 64,
+            Math.min(
+              node.position.x,
+              assignedContainer.position.x + assignedContainer.size.width - node.size.width - 32,
+            ),
+          ),
+          y: Math.max(
+            assignedContainer.position.y + 32,
+            Math.min(
+              node.position.y,
+              assignedContainer.position.y + assignedContainer.size.height - node.size.height - 32,
+            ),
+          ),
+        },
+      }));
+    }
+  }
+
+  return projectEngineState(nextState);
 }
 
 const DIAGRAM_FAMILIES: DiagramFamily[] = [
