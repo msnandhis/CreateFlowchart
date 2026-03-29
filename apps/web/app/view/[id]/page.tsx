@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/shared/ui/Button";
-import type { FlowGraph } from "@createflowchart/core";
+import type { DiagramDocument } from "@createflowchart/schema";
+import { DocumentPreview } from "@/features/diagram/components/DocumentPreview";
 
 interface FlowData {
   id: string;
   title: string;
-  data: FlowGraph;
+  document: DiagramDocument;
   author: {
     name: string;
   };
@@ -85,7 +86,7 @@ export default function ViewPage() {
 
       <main style={styles.main}>
         <div style={styles.flowPreview}>
-          <FlowPreview data={flow.data} />
+          <DocumentPreview document={flow.document} minHeight={520} />
         </div>
       </main>
 
@@ -94,45 +95,6 @@ export default function ViewPage() {
       </footer>
     </div>
   );
-}
-
-function FlowPreview({ data }: { data: FlowGraph }) {
-  const nodes = data.nodes || [];
-  const nodeCount = nodes.length;
-
-  return (
-    <div style={styles.previewContainer}>
-      <div style={styles.nodeCount}>
-        {nodeCount} node{nodeCount !== 1 ? "s" : ""}
-      </div>
-      <div style={styles.minimap}>
-        {nodes.map((node, i) => (
-          <div
-            key={node.id || i}
-            style={{
-              ...styles.miniNode,
-              backgroundColor: getNodeColor(node.type),
-            }}
-          />
-        ))}
-      </div>
-      <p style={styles.previewHint}>Open in editor to see the full flowchart</p>
-    </div>
-  );
-}
-
-function getNodeColor(type?: string): string {
-  switch (type) {
-    case "start":
-    case "end":
-      return "#10b981";
-    case "decision":
-      return "#f59e0b";
-    case "action":
-      return "#3b82f6";
-    default:
-      return "#6b7280";
-  }
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -195,41 +157,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "var(--space-10)",
   },
   flowPreview: {
-    background: "var(--color-surface)",
-    border: "1px solid var(--color-border)",
-    borderRadius: "var(--radius-xl)",
-    padding: "var(--space-10)",
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "var(--space-6)",
-  },
-  previewContainer: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "var(--space-4)",
-  },
-  nodeCount: {
-    fontSize: "var(--font-size-sm)",
-    color: "var(--color-text-muted)",
-  },
-  minimap: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "var(--space-2)",
-    maxWidth: "300px",
-    justifyContent: "center",
-  },
-  miniNode: {
-    width: "12px",
-    height: "12px",
-    borderRadius: "var(--radius-sm)",
-    opacity: 0.7,
-  },
-  previewHint: {
-    fontSize: "var(--font-size-xs)",
-    color: "var(--color-text-muted)",
+    width: "min(1100px, 100%)",
   },
   footer: {
     padding: "var(--space-4)",

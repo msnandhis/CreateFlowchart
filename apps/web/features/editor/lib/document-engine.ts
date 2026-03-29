@@ -1,20 +1,28 @@
 import type { FlowNode } from "@createflowchart/core";
 import {
   addNode as addDocumentNode,
+  addContainer as addDocumentContainer,
   clearSelection,
   createEngineState,
   redo as redoDocumentHistory,
+  removeContainer as removeDocumentContainer,
   removeEdge as removeDocumentEdge,
   removeNode as removeDocumentNode,
   selectEdge,
+  selectContainer,
   selectNode,
   setDocumentTitle,
   undo as undoDocumentHistory,
+  updateContainer as updateDocumentContainer,
   updateNode as updateDocumentNode,
   type EngineSelection,
   type EngineState,
 } from "@createflowchart/engine";
-import type { DiagramDocument, DiagramFamily } from "@createflowchart/schema";
+import type {
+  DiagramContainer,
+  DiagramDocument,
+  DiagramFamily,
+} from "@createflowchart/schema";
 import type { Edge, Node } from "@xyflow/react";
 import {
   documentToFlowGraph,
@@ -186,6 +194,13 @@ export function addLegacyNode(
   return projectEngineState(nextState);
 }
 
+export function addDocumentContainerEntity(
+  engineState: EngineState,
+  container: DiagramContainer,
+): EditorProjection {
+  return projectEngineState(addDocumentContainer(engineState, container));
+}
+
 export function updateDocumentNodeTitle(
   engineState: EngineState,
   nodeId: string,
@@ -281,6 +296,7 @@ export function deleteSelectedEntities(
   engineState: EngineState,
   selectedNodeId: string | null,
   selectedEdgeId: string | null,
+  selectedContainerId: string | null,
 ): EditorProjection {
   let nextState = engineState;
 
@@ -290,6 +306,10 @@ export function deleteSelectedEntities(
 
   if (selectedEdgeId) {
     nextState = removeDocumentEdge(nextState, selectedEdgeId);
+  }
+
+  if (selectedContainerId) {
+    nextState = removeDocumentContainer(nextState, selectedContainerId);
   }
 
   return projectEngineState(nextState);
@@ -315,6 +335,39 @@ export function selectEdgeInEngine(
   id: string | null,
 ): EngineSelection {
   return id ? selectEdge(id) : clearSelection();
+}
+
+export function selectContainerInEngine(
+  _engineState: EngineState,
+  id: string | null,
+): EngineSelection {
+  return id ? selectContainer(id) : clearSelection();
+}
+
+export function updateDocumentContainerLabel(
+  engineState: EngineState,
+  containerId: string,
+  label: string,
+): EditorProjection {
+  return projectEngineState(
+    updateDocumentContainer(engineState, containerId, (container) => ({
+      ...container,
+      label,
+    })),
+  );
+}
+
+export function updateDocumentContainerSize(
+  engineState: EngineState,
+  containerId: string,
+  size: { width: number; height: number },
+): EditorProjection {
+  return projectEngineState(
+    updateDocumentContainer(engineState, containerId, (container) => ({
+      ...container,
+      size,
+    })),
+  );
 }
 
 const DIAGRAM_FAMILIES: DiagramFamily[] = [

@@ -16,7 +16,7 @@ import { nodeTypes } from "./nodes";
 import styles from "../styles/canvas.module.css";
 import type { WebsocketProvider } from "y-websocket";
 import { PresenceLayer } from "./PresenceLayer";
-import { useMemo } from "react";
+import { ContainerLayer } from "./ContainerLayer";
 
 interface CanvasProps {
   provider: WebsocketProvider | null;
@@ -32,6 +32,7 @@ export function Canvas({ provider, updateLocalCursor }: CanvasProps) {
   const onConnect = useEditorStore((s) => s.onConnect);
   const setSelectedNode = useEditorStore((s) => s.setSelectedNode);
   const setSelectedEdge = useEditorStore((s) => s.setSelectedEdge);
+  const setSelectedContainer = useEditorStore((s) => s.setSelectedContainer);
 
   const onNodeClick: NodeMouseHandler = (_, node) => setSelectedNode(node.id);
   const onEdgeClick: EdgeMouseHandler = (_, edge) => setSelectedEdge(edge.id);
@@ -39,6 +40,7 @@ export function Canvas({ provider, updateLocalCursor }: CanvasProps) {
   const onPaneClick = () => {
     setSelectedNode(null);
     setSelectedEdge(null);
+    setSelectedContainer(null);
   };
 
   const handlePointerMove = (event: React.PointerEvent) => {
@@ -87,6 +89,7 @@ export function Canvas({ provider, updateLocalCursor }: CanvasProps) {
           zoomable
           style={{ width: 160, height: 100 }}
         />
+        <ContainerLayer />
         <PresenceLayer provider={provider} />
       </ReactFlow>
     </div>

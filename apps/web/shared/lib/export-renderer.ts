@@ -1,5 +1,5 @@
-import type { FlowGraph } from "@createflowchart/core";
-import { toMermaid } from "@createflowchart/core";
+import type { DiagramDocument } from "@createflowchart/schema";
+import { renderDocumentToSvg } from "@createflowchart/render";
 
 export type ExportFormat = "png" | "svg" | "pdf" | "mermaid" | "json";
 
@@ -10,8 +10,8 @@ export interface ExportResult {
   fileSize?: number;
 }
 
-export function exportAsJSON(flowGraph: FlowGraph): ExportResult {
-  const json = JSON.stringify(flowGraph, null, 2);
+export function exportAsJSON(document: DiagramDocument): ExportResult {
+  const json = JSON.stringify(document, null, 2);
   return {
     success: true,
     format: "json",
@@ -20,8 +20,8 @@ export function exportAsJSON(flowGraph: FlowGraph): ExportResult {
   };
 }
 
-export function exportAsMermaid(flowGraph: FlowGraph): ExportResult {
-  const mermaid = toMermaid(flowGraph);
+export function exportAsMermaid(document: DiagramDocument): ExportResult {
+  const mermaid = documentToMermaid(document);
   return {
     success: true,
     format: "mermaid",
@@ -30,55 +30,8 @@ export function exportAsMermaid(flowGraph: FlowGraph): ExportResult {
   };
 }
 
-export function exportAsSVG(flowGraph: FlowGraph): ExportResult {
-  const nodes = flowGraph.nodes;
-
-  const width = Math.max(800, ...nodes.map((n) => n.position.x + 220));
-  const height = Math.max(600, ...nodes.map((n) => n.position.y + 120));
-
-  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
-  svg += `<style>
-    .bg { fill: #0a0a0a; }
-    .node-rect { fill: #1e1e1e; stroke: #3b82f6; stroke-width: 2; rx: 8; }
-    .node-text { fill: #ffffff; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; text-anchor: middle; dominant-baseline: middle; }
-    .start-rect { fill: #22c55e; stroke: #16a34a; }
-    .end-rect { fill: #ef4444; stroke: #dc2626; }
-    .decision-diamond { fill: #f59e0b; stroke: #d97706; }
-    .action-rect { fill: #8b5cf6; stroke: #7c3aed; }
-  </style>`;
-
-  svg += `<rect class="bg" width="100%" height="100%"/>`;
-
-  const nodeWidth = 180;
-  const nodeHeight = 60;
-
-  const colorMap: Record<string, string> = {
-    start: "start-rect",
-    end: "end-rect",
-    decision: "decision-diamond",
-    action: "action-rect",
-  };
-
-  for (const node of nodes) {
-    const x = node.position.x;
-    const y = node.position.y;
-    const label = node.data.label;
-    const nodeType = node.type;
-    const rectClass = colorMap[nodeType] || "node-rect";
-
-    if (nodeType === "decision") {
-      const cx = x + nodeWidth / 2;
-      const cy = y + nodeHeight / 2;
-      const points = `${cx},${cy - nodeHeight / 2} ${cx + nodeWidth / 2},${cy} ${cx},${cy + nodeHeight / 2} ${cx - nodeWidth / 2},${cy}`;
-      svg += `<polygon points="${points}" class="${rectClass}"/>`;
-      svg += `<text x="${cx}" y="${cy}" class="node-text">${escapeXml(label)}</text>`;
-    } else {
-      svg += `<rect x="${x}" y="${y}" width="${nodeWidth}" height="${nodeHeight}" class="${rectClass}"/>`;
-      svg += `<text x="${x + nodeWidth / 2}" y="${y + nodeHeight / 2}" class="node-text">${escapeXml(label)}</text>`;
-    }
-  }
-
-  svg += `</svg>`;
+export function exportAsSVG(document: DiagramDocument): ExportResult {
+  const svg = renderDocumentToSvg(document);
 
   return {
     success: true,
@@ -88,8 +41,8 @@ export function exportAsSVG(flowGraph: FlowGraph): ExportResult {
   };
 }
 
-export function exportAsPNGData(flowGraph: FlowGraph): ExportResult {
-  const svgResult = exportAsSVG(flowGraph);
+export function exportAsPNGData(document: DiagramDocument): ExportResult {
+  const svgResult = exportAsSVG(document);
   return {
     success: true,
     format: "png",
@@ -98,8 +51,8 @@ export function exportAsPNGData(flowGraph: FlowGraph): ExportResult {
   };
 }
 
-export function exportAsPDFData(flowGraph: FlowGraph): ExportResult {
-  const svgResult = exportAsSVG(flowGraph);
+export function exportAsPDFData(document: DiagramDocument): ExportResult {
+  const svgResult = exportAsSVG(document);
   return {
     success: true,
     format: "pdf",
@@ -108,11 +61,37 @@ export function exportAsPDFData(flowGraph: FlowGraph): ExportResult {
   };
 }
 
-function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+function documentToMermaid(document: DiagramDocument): string {
+  const lines: string[] = ["flowchart TD"];
+
+  for (const node of document.nodes) {
+    const label = node.content.title.replace(/"/g, "'");
+    if (node.kind.includes("start") || node.kind.includes("end")) {
+      lines.push(`    ${node.id}(["${label}"])`);
+      continue;
+    }
+
+    if (node.kind.includes("gateway") || node.kind.includes("decision")) {
+      lines.push(`    ${node.id}{"${label}"}`);
+      continue;
+    }
+
+    if (node.kind.includes("automation") || node.kind.includes("service")) {
+      lines.push(`    ${node.id}[/\"${label}\"/]`);
+      continue;
+    }
+
+    lines.push(`    ${node.id}["${label}"]`);
+  }
+
+  for (const edge of document.edges) {
+    const label = edge.labels[0]?.text;
+    lines.push(
+      label
+        ? `    ${edge.sourceNodeId} -->|"${label.replace(/"/g, "'")}"| ${edge.targetNodeId}`
+        : `    ${edge.sourceNodeId} --> ${edge.targetNodeId}`,
+    );
+  }
+
+  return lines.join("\n");
 }

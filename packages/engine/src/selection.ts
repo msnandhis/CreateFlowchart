@@ -26,3 +26,12 @@ export function selectEdge(id: string): EngineSelection {
     annotationIds: [],
   };
 }
+
+export function selectContainer(id: string): EngineSelection {
+  return {
+    nodeIds: [],
+    edgeIds: [],
+    containerIds: [id],
+    annotationIds: [],
+  };
+}

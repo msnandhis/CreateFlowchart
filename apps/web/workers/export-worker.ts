@@ -4,7 +4,6 @@ import { redis } from "../shared/lib/redis";
 import { db } from "../shared/lib/db";
 import { flows } from "@createflowchart/db/src/schema";
 import { eq } from "drizzle-orm";
-import type { FlowGraph } from "@createflowchart/core";
 import {
   exportAsJSON,
   exportAsMermaid,
@@ -45,7 +44,7 @@ export async function processExportJob(job: Job<ExportRenderJobData>): Promise<{
       title: flow.title,
       authorId: flow.userId,
     });
-    const flowGraph: FlowGraph = normalized.legacy;
+    const document = normalized.document;
 
     await job.updateProgress(25);
 
@@ -59,7 +58,7 @@ export async function processExportJob(job: Job<ExportRenderJobData>): Promise<{
 
     switch (format) {
       case "json": {
-        const jsonResult = exportAsJSON(flowGraph);
+        const jsonResult = exportAsJSON(document);
         if (!jsonResult.content) throw new Error("Failed to generate JSON");
         const key = `export:${flowId}:${Date.now()}.json`;
         await redis.set(key, jsonResult.content, "EX", 3600);
@@ -72,7 +71,7 @@ export async function processExportJob(job: Job<ExportRenderJobData>): Promise<{
         break;
       }
       case "mermaid": {
-        const mermaidResult = exportAsMermaid(flowGraph);
+        const mermaidResult = exportAsMermaid(document);
         if (!mermaidResult.content)
           throw new Error("Failed to generate Mermaid");
         const key = `export:${flowId}:${Date.now()}.mmd`;
@@ -86,7 +85,7 @@ export async function processExportJob(job: Job<ExportRenderJobData>): Promise<{
         break;
       }
       case "svg": {
-        const svgResult = exportAsSVG(flowGraph);
+        const svgResult = exportAsSVG(document);
         if (!svgResult.content) throw new Error("Failed to generate SVG");
         const key = `export:${flowId}:${Date.now()}.svg`;
         await redis.set(key, svgResult.content, "EX", 3600);
@@ -99,7 +98,7 @@ export async function processExportJob(job: Job<ExportRenderJobData>): Promise<{
         break;
       }
       case "png": {
-        const svgResult = exportAsPNGData(flowGraph);
+        const svgResult = exportAsPNGData(document);
         if (!svgResult.content) throw new Error("Failed to generate PNG data");
         const key = `export:${flowId}:${Date.now()}.svg`;
         await redis.set(key, svgResult.content, "EX", 3600);
@@ -113,7 +112,7 @@ export async function processExportJob(job: Job<ExportRenderJobData>): Promise<{
         break;
       }
       case "pdf": {
-        const pdfResult = exportAsPDFData(flowGraph);
+        const pdfResult = exportAsPDFData(document);
         if (!pdfResult.content) throw new Error("Failed to generate PDF data");
         const key = `export:${flowId}:${Date.now()}.svg`;
         await redis.set(key, pdfResult.content, "EX", 3600);

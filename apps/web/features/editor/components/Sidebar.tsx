@@ -2,13 +2,16 @@
 
 import { useMemo, useState } from "react";
 import {
+  useSelectedDocumentContainer,
   useSelectedDocumentNode,
   useEditorStore,
 } from "../stores/editorStore";
 import { Input } from "@/shared/ui/Input";
 import styles from "../styles/sidebar.module.css";
 import {
+  containerPalette,
   createLegacyPaletteNode,
+  createPaletteContainer,
   getPaletteItemByShapeId,
   paletteSections,
 } from "../lib/flowchart-shapes";
@@ -16,11 +19,15 @@ import { ActionNodeConfigPanel } from "./ActionNodeConfigPanel";
 
 export function Sidebar() {
   const selectedNode = useSelectedDocumentNode();
+  const selectedContainer = useSelectedDocumentContainer();
   const updateNodeLabel = useEditorStore((s) => s.updateNodeLabel);
   const updateNodeShape = useEditorStore((s) => s.updateNodeShape);
   const updateNodeSize = useEditorStore((s) => s.updateNodeSize);
   const updateNodeAutomation = useEditorStore((s) => s.updateNodeAutomation);
   const addNode = useEditorStore((s) => s.addNode);
+  const addContainer = useEditorStore((s) => s.addContainer);
+  const updateContainerLabel = useEditorStore((s) => s.updateContainerLabel);
+  const updateContainerSize = useEditorStore((s) => s.updateContainerSize);
   const [showAutomationConfig, setShowAutomationConfig] = useState(false);
 
   const selectedShape = useMemo(
@@ -164,9 +171,56 @@ export function Sidebar() {
               </div>
             )}
           </div>
+        ) : selectedContainer ? (
+          <div className={styles.section}>
+            <div className={styles.sectionTitle}>Container Config</div>
+            <Input
+              label="Label"
+              value={selectedContainer.label}
+              onChange={(e) =>
+                updateContainerLabel(selectedContainer.id, e.target.value)
+              }
+            />
+            <div style={{ marginTop: "1rem" }}>
+              <div className={styles.sectionTitle}>Family</div>
+              <div className={styles.metaValue}>{selectedContainer.family}</div>
+            </div>
+            <div style={{ marginTop: "1rem" }}>
+              <div className={styles.sectionTitle}>Type</div>
+              <div className={styles.metaValue}>{selectedContainer.type}</div>
+            </div>
+            <div style={{ marginTop: "1rem" }}>
+              <div className={styles.sectionTitle}>Width</div>
+              <input
+                type="number"
+                value={Math.round(selectedContainer.size.width)}
+                onChange={(e) =>
+                  updateContainerSize(selectedContainer.id, {
+                    width: Math.max(160, Number(e.target.value) || 160),
+                    height: selectedContainer.size.height,
+                  })
+                }
+                className={styles.titleInput}
+              />
+            </div>
+            <div style={{ marginTop: "1rem" }}>
+              <div className={styles.sectionTitle}>Height</div>
+              <input
+                type="number"
+                value={Math.round(selectedContainer.size.height)}
+                onChange={(e) =>
+                  updateContainerSize(selectedContainer.id, {
+                    width: selectedContainer.size.width,
+                    height: Math.max(80, Number(e.target.value) || 80),
+                  })
+                }
+                className={styles.titleInput}
+              />
+            </div>
+          </div>
         ) : (
           <div className={styles.emptyState}>
-            <p>Select a node to edit its properties</p>
+            <p>Select a node or container to edit its properties</p>
           </div>
         )}
 
@@ -191,6 +245,23 @@ export function Sidebar() {
               </div>
             </div>
           ))}
+        </div>
+
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Add Containers</div>
+          <div className={styles.nodeList}>
+            {containerPalette.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={styles.draggableNode}
+                onClick={() => addContainer(createPaletteContainer(item.id))}
+                title={item.description}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       {selectedNode && showAutomationConfig && (

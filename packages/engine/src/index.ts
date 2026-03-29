@@ -7,7 +7,7 @@ export {
   undo,
   redo,
 } from "./history";
-export { clearSelection, selectNode, selectEdge } from "./selection";
+export { clearSelection, selectNode, selectEdge, selectContainer } from "./selection";
 
 export {
   setSelection,
@@ -19,6 +19,8 @@ export {
   updateEdge,
   removeEdge,
   addContainer,
+  updateContainer,
+  removeContainer,
   addAnnotation,
   replaceDocument,
 } from "./commands";

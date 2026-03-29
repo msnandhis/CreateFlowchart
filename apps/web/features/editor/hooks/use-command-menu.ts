@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { diagramPalette } from "../lib/flowchart-shapes";
+import { containerPalette, diagramPalette } from "../lib/flowchart-shapes";
 
 interface Command {
   id: string;
@@ -14,6 +14,7 @@ interface Command {
 
 export interface UseCommandMenuOptions {
   onAddNode: (typeOrShapeId: string) => void;
+  onAddContainer: (containerId: string) => void;
   onAutoLayout: () => void;
   onGenerate: () => void;
   onAnalyze: () => void;
@@ -29,6 +30,7 @@ export interface UseCommandMenuOptions {
 export function useCommandMenu({
   onAddNode,
   onAutoLayout,
+  onAddContainer,
   onGenerate,
   onAnalyze,
   onExport,
@@ -53,8 +55,18 @@ export function useCommandMenu({
     action: () => onAddNode(item.shapeId),
   }));
 
+  const addContainerCommands: Command[] = containerPalette.map((item) => ({
+    id: `add-container-${item.id}`,
+    label: `Add ${item.label}`,
+    description: item.description,
+    icon: item.family === "bpmn" ? "▥" : "▤",
+    category: "add",
+    action: () => onAddContainer(item.id),
+  }));
+
   const commands: Command[] = [
     ...addCommands,
+    ...addContainerCommands,
     {
       id: "undo",
       label: "Undo",

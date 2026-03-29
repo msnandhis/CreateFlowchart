@@ -6,11 +6,14 @@ import {
 } from "../hooks/use-command-menu";
 import { useEditorStore } from "../stores/editorStore";
 import styles from "../styles/command-menu.module.css";
-import { createLegacyPaletteNode } from "../lib/flowchart-shapes";
+import {
+  createLegacyPaletteNode,
+  createPaletteContainer,
+} from "../lib/flowchart-shapes";
 
 interface CommandMenuProps extends Omit<
   UseCommandMenuOptions,
-  "onAddNode" | "canUndo" | "canRedo"
+  "onAddNode" | "onAddContainer" | "canUndo" | "canRedo"
 > {
   onOpenGenerate?: () => void;
   onOpenAnalyze?: () => void;
@@ -40,6 +43,10 @@ export function CommandMenu({
   } = useCommandMenu({
     onAddNode: (typeOrShapeId: string) => {
       addNodeByType(typeOrShapeId);
+      close();
+    },
+    onAddContainer: (containerId: string) => {
+      addContainerByType(containerId);
       close();
     },
     onAutoLayout: () => {
@@ -80,6 +87,10 @@ export function CommandMenu({
 
   const addNodeByType = (typeOrShapeId: string) => {
     useEditorStore.getState().addNode(createLegacyPaletteNode(typeOrShapeId));
+  };
+
+  const addContainerByType = (containerId: string) => {
+    useEditorStore.getState().addContainer(createPaletteContainer(containerId));
   };
 
   if (!isOpen) return null;

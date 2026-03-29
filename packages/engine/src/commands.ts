@@ -153,6 +153,35 @@ export function addContainer(
   });
 }
 
+export function updateContainer(
+  state: EngineState,
+  containerId: string,
+  updater: (container: DiagramContainer) => DiagramContainer,
+): EngineState {
+  const nextDocument = replaceMetadataTimestamp({
+    ...state.document,
+    containers: state.document.containers.map((container) =>
+      container.id === containerId ? updater(container) : container,
+    ),
+  });
+
+  return withCommittedChange(state, nextDocument);
+}
+
+export function removeContainer(state: EngineState, containerId: string): EngineState {
+  const nextDocument = replaceMetadataTimestamp({
+    ...state.document,
+    containers: state.document.containers.filter(
+      (container) => container.id !== containerId,
+    ),
+  });
+
+  return withCommittedChange(state, nextDocument, {
+    ...state.selection,
+    containerIds: state.selection.containerIds.filter((id) => id !== containerId),
+  });
+}
+
 export function addAnnotation(
   state: EngineState,
   annotation: DiagramAnnotation,

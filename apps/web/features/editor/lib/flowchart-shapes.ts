@@ -1,7 +1,10 @@
 import type { NodeType, FlowNode } from "@createflowchart/core";
 import {
   bpmnLiteShapes,
+  containerPresets,
   flowchartShapes,
+  type ContainerType,
+  type DiagramContainer,
   type DiagramFamily,
   type ShapeDefinition,
 } from "@createflowchart/schema";
@@ -43,9 +46,12 @@ function mapShapeToPaletteItem(shape: ShapeDefinition): FlowchartPaletteItem {
 }
 
 const shapeLibrary = [...flowchartShapes, ...bpmnLiteShapes];
+const nodeShapeLibrary = shapeLibrary.filter(
+  (shape) => !shape.tags.includes("container"),
+);
 
 export const diagramPalette: FlowchartPaletteItem[] =
-  shapeLibrary.map(mapShapeToPaletteItem);
+  nodeShapeLibrary.map(mapShapeToPaletteItem);
 
 export const flowchartPalette: FlowchartPaletteItem[] =
   diagramPalette.filter((item) => item.family === "flowchart");
@@ -79,6 +85,59 @@ export function getPaletteItemByShapeId(shapeId: string): FlowchartPaletteItem |
 
 export function getShapeDefinition(shapeId: string): ShapeDefinition | null {
   return shapeDefinitionMap[shapeId] ?? null;
+}
+
+export interface ContainerPaletteItem {
+  id: string;
+  family: DiagramFamily;
+  type: ContainerType;
+  label: string;
+  description: string;
+  defaultSize: {
+    width: number;
+    height: number;
+  };
+}
+
+export const containerPalette: ContainerPaletteItem[] = containerPresets.map(
+  (container) => ({
+    id: container.id,
+    family: container.family,
+    type: container.type,
+    label: container.displayName,
+    description: container.description ?? container.displayName,
+    defaultSize: {
+      width: container.defaultWidth,
+      height: container.defaultHeight,
+    },
+  }),
+);
+
+export function createPaletteContainer(
+  containerId: string,
+  position?: { x: number; y: number },
+): DiagramContainer {
+  const item =
+    containerPalette.find((container) => container.id === containerId) ??
+    containerPalette[0];
+
+  return {
+    id: `container_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+    family: item.family,
+    type: item.type,
+    label: item.label,
+    position: position ?? {
+      x: 80,
+      y: 80,
+    },
+    size: item.defaultSize,
+    childNodeIds: [],
+    childContainerIds: [],
+    style: { tokens: {} },
+    metadata: {
+      presetId: item.id,
+    },
+  };
 }
 
 export function createLegacyPaletteNode(

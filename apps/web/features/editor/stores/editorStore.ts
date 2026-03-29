@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { ActionConfig, FlowGraph, FlowNode } from "@createflowchart/core";
 import { createEmptyFlowGraph, validateFlowGraph } from "@createflowchart/core";
 import type { EngineState } from "@createflowchart/engine";
-import type { DiagramDocument } from "@createflowchart/schema";
+import type { DiagramContainer, DiagramDocument } from "@createflowchart/schema";
 import type {
   Connection,
   Edge,
@@ -13,15 +13,19 @@ import type {
 import { addEdge, applyEdgeChanges, applyNodeChanges } from "@xyflow/react";
 import {
   addLegacyNode,
+  addDocumentContainerEntity,
   applyReactFlowProjection,
   createEditorProjection,
   deleteSelectedEntities,
   projectEngineState,
   redoEditor,
+  selectContainerInEngine,
   selectEdgeInEngine,
   selectNodeInEngine,
   setEditorTitle,
   undoEditor,
+  updateDocumentContainerLabel,
+  updateDocumentContainerSize,
   updateDocumentNodeAutomation,
   updateDocumentNodeShape,
   updateDocumentNodeSize,
@@ -43,6 +47,7 @@ interface EditorState {
   title: string;
   selectedNodeId: string | null;
   selectedEdgeId: string | null;
+  selectedContainerId: string | null;
   setFlowGraph: (fg: FlowGraph) => void;
   loadFlow: (
     fg: FlowGraph,
@@ -56,12 +61,19 @@ interface EditorState {
   onEdgesChange: OnEdgesChange;
   onConnect: (connection: Connection) => void;
   addNode: (node: FlowNode) => void;
+  addContainer: (container: DiagramContainer) => void;
   deleteSelected: () => void;
   setSelectedNode: (id: string | null) => void;
   setSelectedEdge: (id: string | null) => void;
+  setSelectedContainer: (id: string | null) => void;
   updateNodeLabel: (id: string, label: string) => void;
   updateNodeShape: (id: string, shapeId: string) => void;
   updateNodeSize: (
+    id: string,
+    size: { width: number; height: number },
+  ) => void;
+  updateContainerLabel: (id: string, label: string) => void;
+  updateContainerSize: (
     id: string,
     size: { width: number; height: number },
   ) => void;
@@ -118,6 +130,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   title: "Untitled Flow",
   selectedNodeId: null,
   selectedEdgeId: null,
+  selectedContainerId: null,
 
   setFlowGraph: (fg) => {
     set((s) => syncFromFlowGraph(fg, s.title));
@@ -140,6 +153,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       title: title ?? "Untitled Flow",
       selectedNodeId: null,
       selectedEdgeId: null,
+      selectedContainerId: null,
     });
   },
 
@@ -171,6 +185,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       isDirty: false,
       selectedNodeId: null,
       selectedEdgeId: null,
+      selectedContainerId: null,
     });
   },
 
@@ -209,16 +224,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => syncFromProjection(addLegacyNode(s.engineState, node)));
   },
 
+  addContainer: (container) => {
+    set((s) => syncFromProjection(addDocumentContainerEntity(s.engineState, container)));
+  },
+
   deleteSelected: () => {
-    const { selectedNodeId, selectedEdgeId } = get();
-    if (!selectedNodeId && !selectedEdgeId) return;
+    const { selectedNodeId, selectedEdgeId, selectedContainerId } = get();
+    if (!selectedNodeId && !selectedEdgeId && !selectedContainerId) return;
 
     set((s) => ({
       ...syncFromProjection(
-        deleteSelectedEntities(s.engineState, selectedNodeId, selectedEdgeId),
+        deleteSelectedEntities(
+          s.engineState,
+          selectedNodeId,
+          selectedEdgeId,
+          selectedContainerId,
+        ),
       ),
       selectedNodeId: null,
       selectedEdgeId: null,
+      selectedContainerId: null,
     }));
   },
 
@@ -230,6 +255,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       },
       selectedNodeId: id,
       selectedEdgeId: null,
+      selectedContainerId: null,
     })),
 
   setSelectedEdge: (id) =>
@@ -240,6 +266,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       },
       selectedEdgeId: id,
       selectedNodeId: null,
+      selectedContainerId: null,
+    })),
+
+  setSelectedContainer: (id) =>
+    set((s) => ({
+      engineState: {
+        ...s.engineState,
+        selection: selectContainerInEngine(s.engineState, id),
+      },
+      selectedContainerId: id,
+      selectedNodeId: null,
+      selectedEdgeId: null,
     })),
 
   updateNodeLabel: (id, label) => {
@@ -257,6 +295,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   updateNodeSize: (id, size) => {
     set((s) =>
       syncFromProjection(updateDocumentNodeSize(s.engineState, id, size)),
+    );
+  },
+
+  updateContainerLabel: (id, label) => {
+    set((s) =>
+      syncFromProjection(updateDocumentContainerLabel(s.engineState, id, label)),
+    );
+  },
+
+  updateContainerSize: (id, size) => {
+    set((s) =>
+      syncFromProjection(updateDocumentContainerSize(s.engineState, id, size)),
     );
   },
 
@@ -298,6 +348,11 @@ export const useSelectedDocumentNode = () => {
   const id = useEditorStore((s) => s.selectedNodeId);
   const document = useEditorStore((s) => s.document);
   return id ? document.nodes.find((node) => node.id === id) ?? null : null;
+};
+export const useSelectedDocumentContainer = () => {
+  const id = useEditorStore((s) => s.selectedContainerId);
+  const document = useEditorStore((s) => s.document);
+  return id ? document.containers.find((container) => container.id === id) ?? null : null;
 };
 export const useSelectedNode = () => {
   const id = useEditorStore((s) => s.selectedNodeId);

@@ -93,3 +93,8 @@
   background: var(--color-border);
   margin: var(--space-4) 0;
 }
+
+.metaValue {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
