@@ -6,7 +6,7 @@ import { useEditorStore } from "../stores/editorStore";
  * Debounces updates by 3 seconds when 'isDirty' is true.
  */
 export function useAutosave() {
-  const { flowGraph, flowId, mode, isDirty, title, markClean } = useEditorStore();
+  const { flowGraph, document, flowId, mode, isDirty, title, markClean } = useEditorStore();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -21,7 +21,12 @@ export function useAutosave() {
         const response = await fetch(`/api/flows/${flowId}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title, data: flowGraph }),
+          body: JSON.stringify({
+            title,
+            data: flowGraph,
+            document,
+            formatVersion: "flowgraph-v1+document-v2",
+          }),
         });
 
         if (response.ok) {
@@ -38,5 +43,5 @@ export function useAutosave() {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [flowGraph, title, isDirty, flowId, mode, markClean]);
+  }, [flowGraph, document, title, isDirty, flowId, mode, markClean]);
 }

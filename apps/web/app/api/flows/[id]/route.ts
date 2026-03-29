@@ -6,6 +6,11 @@ import { db } from "@/shared/lib/db";
 import { flows, users } from "@createflowchart/db";
 import { eq, and } from "drizzle-orm";
 import { headers } from "next/headers";
+import {
+  documentToFlowGraph,
+  isDiagramDocument,
+  toDiagramDocument,
+} from "@/features/editor/lib/document-compat";
 
 /**
  * Get Flow by ID
@@ -41,6 +46,13 @@ export async function GET(
       id: flow.id,
       title: flow.title,
       data: flow.data,
+      document: toDiagramDocument({
+        id: flow.id,
+        title: flow.title,
+        data: typeof flow.data === "string" ? JSON.parse(flow.data) : flow.data,
+        authorId: flow.userId,
+      }),
+      formatVersion: "flowgraph-v1",
       isPublic: flow.isPublic,
       isFeatured: flow.isFeatured,
       likeCount: flow.likeCount,
@@ -82,14 +94,18 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const { title, data, isPublic } = body;
+    const { title, data, document, isPublic } = body;
+
+    const persistedData =
+      data ??
+      (isDiagramDocument(document) ? documentToFlowGraph(document) : undefined);
 
     // Build update object dynamically
     const updateData: any = {
       updatedAt: new Date(),
     };
     if (title !== undefined) updateData.title = title;
-    if (data !== undefined) updateData.data = data;
+    if (persistedData !== undefined) updateData.data = persistedData;
     if (isPublic !== undefined) updateData.isPublic = isPublic;
 
     const result = await db
@@ -102,7 +118,21 @@ export async function PATCH(
       return NextResponse.json({ error: "Flow not found or unauthorized" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, flow: result[0] });
+    return NextResponse.json({
+      success: true,
+      flow: result[0],
+      document: isDiagramDocument(document)
+        ? document
+        : toDiagramDocument({
+            id: result[0].id,
+            title: result[0].title,
+            data: typeof result[0].data === "string"
+              ? JSON.parse(result[0].data)
+              : result[0].data,
+            authorId: result[0].userId,
+          }),
+      formatVersion: "flowgraph-v1",
+    });
   } catch (error: any) {
     console.error("[Flow Update Error]:", error);
     return NextResponse.json({ error: "Failed to update flow", message: error.message }, { status: 500 });
