@@ -3,6 +3,20 @@ import { FlowGraphSchema } from "@createflowchart/core";
 import type { FlowGraph } from "@createflowchart/core";
 import type { AIGenerationJobData } from "../shared/lib/queue";
 import { redis } from "../shared/lib/redis";
+import { aiPipeline } from "../shared/lib/ai-gateway";
+import {
+  SYSTEM_PROMPT,
+  buildGeneratePrompt,
+  ANALYZE_SYSTEM_PROMPT,
+  parseAnalyzeResponse,
+  type AnalyzeReport,
+  IMPROVE_SYSTEM_PROMPT,
+  parseImproveResponse,
+  type ImproveReport,
+  EXPLAIN_SYSTEM_PROMPT,
+  parseExplainResponse,
+  type ExplainReport,
+} from "@createflowchart/ai";
 
 export interface GenerateResult {
   flow: FlowGraph;
@@ -217,22 +231,38 @@ async function handleGenerate(
   prompt: string,
   jobId: string,
 ): Promise<AIJobResult> {
+  const flowGraph = FlowGraphSchema.parse({
+    nodes: [],
+    edges: [],
+    meta: { version: 1, createdBy: userId, isSandbox: true },
+  });
+
+  const result = await aiPipeline.generate({
+    prompt: buildGeneratePrompt(prompt),
+    systemPrompt: SYSTEM_PROMPT,
+  });
+
+  if (!result.success || !result.data) {
+    throw result.error || new Error("Generation failed");
+  }
+
+  const generatedFlow = {
+    ...result.data,
+    meta: { ...result.data.meta, createdBy: userId, isSandbox: true },
+  };
+
   return {
     success: true,
     jobId,
     action: "generate",
     data: {
-      flow: {
-        nodes: [],
-        edges: [],
-        meta: { version: 1, isSandbox: true },
-      },
-      provider: "placeholder",
-      model: "placeholder",
-      confidence: 0,
-      nodeConfidences: {},
-      edgeConfidences: {},
-      repairAttempts: 0,
+      flow: generatedFlow,
+      provider: result.metadata.provider,
+      model: result.metadata.model,
+      confidence: result.metadata.confidence,
+      nodeConfidences: result.metadata.nodeConfidences,
+      edgeConfidences: result.metadata.edgeConfidences,
+      repairAttempts: result.metadata.repairAttempts,
     },
     startedAt: "",
     completedAt: "",
@@ -246,14 +276,48 @@ async function handleAnalyze(
   existingFlowGraph?: string,
   jobId?: string,
 ): Promise<AIJobResult> {
+  if (!existingFlowGraph) {
+    throw new Error("No existing flow graph provided for analysis");
+  }
+
+  let parsedFlow: FlowGraph;
+  try {
+    parsedFlow = JSON.parse(existingFlowGraph);
+  } catch {
+    throw new Error("Invalid flow graph JSON");
+  }
+
+  const analysisPrompt = `Analyze the following flowchart and identify any issues.\n\nUser context: ${prompt}`;
+
+  const result = await aiPipeline.generate({
+    prompt: analysisPrompt,
+    context: parsedFlow,
+    systemPrompt: ANALYZE_SYSTEM_PROMPT,
+  });
+
+  if (!result.success) {
+    throw result.error || new Error("Analysis failed");
+  }
+
+  const report: AnalyzeReport = parseAnalyzeResponse(
+    result.data as unknown as string,
+  );
+
+  const issues = report.issues.map((issue) => ({
+    type: issue.type as "dead_end" | "loop" | "decision" | "depth" | "other",
+    nodeId: issue.nodeId || undefined,
+    message: issue.message,
+    severity: issue.severity,
+  }));
+
   return {
     success: true,
     jobId: jobId || "",
     action: "analyze",
     data: {
-      issues: [],
-      overallHealth: 100,
-      suggestions: [],
+      issues,
+      overallHealth: report.overallHealth,
+      suggestions: report.suggestions,
     },
     startedAt: "",
     completedAt: "",
@@ -267,15 +331,54 @@ async function handleImprove(
   existingFlowGraph?: string,
   jobId?: string,
 ): Promise<AIJobResult> {
+  if (!existingFlowGraph) {
+    throw new Error("No existing flow graph provided for improvement");
+  }
+
+  let parsedFlow: FlowGraph;
+  try {
+    parsedFlow = JSON.parse(existingFlowGraph);
+  } catch {
+    throw new Error("Invalid flow graph JSON");
+  }
+
+  const improvePrompt = `Improve this flowchart according to the following instructions:\n${prompt}`;
+
+  const result = await aiPipeline.generate({
+    prompt: improvePrompt,
+    context: parsedFlow,
+    systemPrompt: IMPROVE_SYSTEM_PROMPT,
+  });
+
+  if (!result.success) {
+    throw result.error || new Error("Improvement failed");
+  }
+
+  const report: ImproveReport = parseImproveResponse(
+    result.data as unknown as string,
+  );
+  const validatedFlow = FlowGraphSchema.safeParse(report.improved);
+
+  const originalFlow = {
+    ...parsedFlow,
+    meta: { ...parsedFlow.meta, isSandbox: true },
+  };
+
   return {
     success: true,
     jobId: jobId || "",
     action: "improve",
     data: {
-      original: { nodes: [], edges: [], meta: { version: 1, isSandbox: true } },
-      improved: { nodes: [], edges: [], meta: { version: 1, isSandbox: true } },
-      changes: [],
-      confidence: 0,
+      original: originalFlow,
+      improved: validatedFlow.success
+        ? validatedFlow.data
+        : (report.improved as FlowGraph),
+      changes: report.changes.map((change) => ({
+        type: change.type,
+        description: change.description,
+        nodeId: change.nodeId || undefined,
+      })),
+      confidence: report.confidence,
     },
     startedAt: "",
     completedAt: "",
@@ -288,13 +391,46 @@ async function handleExplain(
   existingFlowGraph?: string,
   jobId?: string,
 ): Promise<AIJobResult> {
+  if (!existingFlowGraph) {
+    throw new Error("No existing flow graph provided for explanation");
+  }
+
+  let parsedFlow: FlowGraph;
+  try {
+    parsedFlow = JSON.parse(existingFlowGraph);
+  } catch {
+    throw new Error("Invalid flow graph JSON");
+  }
+
+  const explainPrompt = "Explain how this flowchart works.";
+
+  const result = await aiPipeline.generate({
+    prompt: explainPrompt,
+    context: parsedFlow,
+    systemPrompt: EXPLAIN_SYSTEM_PROMPT,
+  });
+
+  if (!result.success) {
+    throw result.error || new Error("Explanation generation failed");
+  }
+
+  const report: ExplainReport = parseExplainResponse(
+    result.data as unknown as string,
+  );
+
+  const markdown = `# Flowchart Explanation\n\n${report.overview}\n\n## Node Walkthrough\n\n${report.nodeWalkthrough.map((node) => `### ${node.label} (${node.type})\n\n${node.explanation}`).join("\n\n")}\n\n## Main Paths\n\n${report.mainPaths.map((path) => `- ${path.description}: ${path.steps.join(" → ")}`).join("\n")}\n\n## Key Insights\n\n${report.keyInsights.map((insight) => `- ${insight}`).join("\n")}`;
+
   return {
     success: true,
     jobId: jobId || "",
     action: "explain",
     data: {
-      markdown: "",
-      nodeWalkthrough: [],
+      markdown,
+      nodeWalkthrough: report.nodeWalkthrough.map((node) => ({
+        nodeId: node.nodeId,
+        label: node.label,
+        explanation: node.explanation,
+      })),
     },
     startedAt: "",
     completedAt: "",

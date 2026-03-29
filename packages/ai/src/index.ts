@@ -16,6 +16,23 @@ export {
   XAIProvider,
 } from "./providers";
 export { AIError } from "./providers";
-export type { AnalyzeReport } from "./prompts/analyze";
-export type { ImproveReport } from "./prompts/improve";
-export type { ExplainReport } from "./prompts/explain";
+export {
+  SYSTEM_PROMPT,
+  buildGeneratePrompt,
+  EXAMPLE_FLOWS,
+} from "./prompts/generate";
+export {
+  ANALYZE_SYSTEM_PROMPT,
+  parseAnalyzeResponse,
+  type AnalyzeReport,
+} from "./prompts/analyze";
+export {
+  IMPROVE_SYSTEM_PROMPT,
+  parseImproveResponse,
+  type ImproveReport,
+} from "./prompts/improve";
+export {
+  EXPLAIN_SYSTEM_PROMPT,
+  parseExplainResponse,
+  type ExplainReport,
+} from "./prompts/explain";
