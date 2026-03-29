@@ -1,8 +1,8 @@
-import { Job } from "bullmq";
+import { Job, Worker } from "bullmq";
 import type { ExportRenderJobData } from "../shared/lib/queue";
 import { redis } from "../shared/lib/redis";
 import { db } from "../shared/lib/db";
-import { flows } from "@createflowchart/db/schema";
+import { flows } from "@createflowchart/db/src/schema";
 import { eq } from "drizzle-orm";
 import type { FlowGraph } from "@createflowchart/core";
 import { toMermaid } from "@createflowchart/core";
@@ -198,10 +198,10 @@ async function exportAsPDF(
 export function createExportWorker() {
   const { Worker } = require("bullmq");
 
-  const worker = new Worker<ExportRenderJobData>(
+  const worker = new Worker(
     "export-render",
-    async (job: Job<ExportRenderJobData>) => {
-      return processExportJob(job);
+    async (job: Job) => {
+      return processExportJob(job as Job<ExportRenderJobData>);
     },
     {
       connection: redis.duplicate(),

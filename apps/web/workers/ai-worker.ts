@@ -1,5 +1,8 @@
+import type { Job } from "bullmq";
 import { FlowGraphSchema } from "@createflowchart/core";
 import type { FlowGraph } from "@createflowchart/core";
+import type { AIGenerationJobData } from "../shared/lib/queue";
+import { redis } from "../shared/lib/redis";
 
 export interface GenerateResult {
   flow: FlowGraph;
@@ -112,7 +115,11 @@ export function attemptAutoRepair(data: unknown): FlowGraph | null {
           y: typeof pos?.y === "number" ? pos.y : 0,
         },
         data: {
-          label: String(node.data?.label || node.label || "Untitled"),
+          label: String(
+            (node.data as { label?: unknown })?.label ??
+              (node as { label?: unknown })?.label ??
+              "Untitled",
+          ),
           confidence: 0.5,
           meta: {},
         },
@@ -143,4 +150,187 @@ export function attemptAutoRepair(data: unknown): FlowGraph | null {
   };
 
   return validateFlowGraphResponse(repaired);
+}
+
+export async function processAIJob(
+  job: Job<AIGenerationJobData>,
+): Promise<AIJobResult> {
+  const { userId, prompt, action, flowId, existingFlowGraph } = job.data;
+  const startedAt = new Date().toISOString();
+
+  console.log(`[AIWorker] Processing ${action} job for user ${userId}`);
+
+  try {
+    const sanitizedPrompt = sanitizePrompt(prompt);
+    let result: AIJobResult;
+
+    switch (action) {
+      case "generate":
+        result = await handleGenerate(userId, sanitizedPrompt, job.id!);
+        break;
+      case "analyze":
+        result = await handleAnalyze(
+          userId,
+          sanitizedPrompt,
+          existingFlowGraph,
+          job.id!,
+        );
+        break;
+      case "improve":
+        result = await handleImprove(
+          userId,
+          sanitizedPrompt,
+          existingFlowGraph,
+          job.id!,
+        );
+        break;
+      case "explain":
+        result = await handleExplain(userId, existingFlowGraph, job.id!);
+        break;
+      default:
+        throw new Error(`Unknown action: ${action}`);
+    }
+
+    result.startedAt = startedAt;
+    result.completedAt = new Date().toISOString();
+    result.duration =
+      new Date(result.completedAt).getTime() - new Date(startedAt).getTime();
+
+    await job.updateProgress(100);
+    return result;
+  } catch (error) {
+    console.error(`[AIWorker] Job failed:`, error);
+    return {
+      success: false,
+      error: String(error),
+      jobId: job.id!,
+      action,
+      startedAt,
+      completedAt: new Date().toISOString(),
+      duration: 0,
+    };
+  }
+}
+
+async function handleGenerate(
+  userId: string,
+  prompt: string,
+  jobId: string,
+): Promise<AIJobResult> {
+  return {
+    success: true,
+    jobId,
+    action: "generate",
+    data: {
+      flow: {
+        nodes: [],
+        edges: [],
+        meta: { version: 1, isSandbox: true },
+      },
+      provider: "placeholder",
+      model: "placeholder",
+      confidence: 0,
+      nodeConfidences: {},
+      edgeConfidences: {},
+      repairAttempts: 0,
+    },
+    startedAt: "",
+    completedAt: "",
+    duration: 0,
+  };
+}
+
+async function handleAnalyze(
+  userId: string,
+  prompt: string,
+  existingFlowGraph?: string,
+  jobId?: string,
+): Promise<AIJobResult> {
+  return {
+    success: true,
+    jobId: jobId || "",
+    action: "analyze",
+    data: {
+      issues: [],
+      overallHealth: 100,
+      suggestions: [],
+    },
+    startedAt: "",
+    completedAt: "",
+    duration: 0,
+  };
+}
+
+async function handleImprove(
+  userId: string,
+  prompt: string,
+  existingFlowGraph?: string,
+  jobId?: string,
+): Promise<AIJobResult> {
+  return {
+    success: true,
+    jobId: jobId || "",
+    action: "improve",
+    data: {
+      original: { nodes: [], edges: [], meta: { version: 1, isSandbox: true } },
+      improved: { nodes: [], edges: [], meta: { version: 1, isSandbox: true } },
+      changes: [],
+      confidence: 0,
+    },
+    startedAt: "",
+    completedAt: "",
+    duration: 0,
+  };
+}
+
+async function handleExplain(
+  userId: string,
+  existingFlowGraph?: string,
+  jobId?: string,
+): Promise<AIJobResult> {
+  return {
+    success: true,
+    jobId: jobId || "",
+    action: "explain",
+    data: {
+      markdown: "",
+      nodeWalkthrough: [],
+    },
+    startedAt: "",
+    completedAt: "",
+    duration: 0,
+  };
+}
+
+export function createAIGatewayWorker() {
+  const { Worker } = require("bullmq");
+
+  const worker = new Worker(
+    "ai-generation",
+    async (job: Job) => {
+      return processAIJob(job as Job<AIGenerationJobData>);
+    },
+    {
+      connection: redis.duplicate(),
+      concurrency: 5,
+      removeOnComplete: { count: 100 },
+      removeOnFail: { count: 200 },
+    },
+  );
+
+  worker.on("completed", (job: Job | undefined) => {
+    console.log(`[AIWorker] Job ${job?.id} completed`);
+  });
+
+  worker.on("failed", (job: Job | undefined, err: Error) => {
+    console.error(`[AIWorker] Job ${job?.id} failed:`, err);
+  });
+
+  worker.on("progress", (job: Job, progress: number | object) => {
+    console.log(
+      `[AIWorker] Job ${job.id} progress: ${JSON.stringify(progress)}`,
+    );
+  });
+
+  return worker;
 }

@@ -7,35 +7,35 @@
 
 ## 1. Tech Stack & Roles
 
-| Layer | Technology | Version | Role |
-|---|---|---|---|
-| **Framework** | Next.js (App Router) | 16.2.1 | SSR/RSC for SEO, API routes, Turbopack dev |
-| **UI** | React | 19.x | Components, Server Components, Hooks, Actions |
-| **Canvas** | @xyflow/react (React Flow) | 12.x | Node/edge rendering, drag-drop, custom nodes |
-| **Layout Engine** | ELK.js (`elkjs`) | latest | Auto-layout in Web Worker (layered/hierarchical) |
-| **Client State** | Zustand | 5.x | Editor state, auth, UI — client components only |
-| **Server State** | TanStack Query | 5.x | Fetch/cache server data (flows, templates) |
-| **Validation** | Zod | 3.x | FlowGraph schema, API input/output validation |
-| **Styling** | Vanilla CSS + CSS Modules | — | Design tokens (custom properties), scoped styles |
-| **Fonts** | Google Fonts (Inter) | — | Typography via `next/font/google` |
-| **Realtime CRDT** | Yjs | 13.x | Conflict-free shared FlowGraph state |
-| **Realtime Server** | Node.js + `ws` + `y-websocket` | 22.x LTS | Standalone WSS for Yjs sync, presence, snapshots |
-| **Database** | PostgreSQL | 16.x | Users, flows, versions, templates |
-| **Vector Search** | pgvector | 0.7+ | Semantic template search (cosine similarity) |
-| **ORM** | Drizzle ORM | latest | Type-safe queries, migrations, schema |
-| **Auth** | Better Auth | latest | OAuth (GitHub, Google), email/password, JWT sessions, Drizzle adapter |
-| **AI Gateway** | Multi-Provider (OpenRouter, OpenAI, Anthropic, xAI) | — | Priority-based fallback routing across providers |
-| **Embeddings** | OpenAI `text-embedding-3-small` | — | 1536-dim vectors for template search |
-| **Queue** | BullMQ | 5.x | Background jobs: AI generation, export rendering, embedding generation |
-| **Cache/Queue Store** | Redis (self-hosted via Coolify) | 7.x | Rate limiting, BullMQ backing store, session cache, Yjs snapshot buffer |
-| **Rate Limiting** | Custom (Redis `INCR` + `EXPIRE`) | — | 10 AI gen/min/user, per-socket WS limits |
-| **Export** | `html-to-image` + `@react-pdf/renderer` | — | PNG, SVG, PDF, Mermaid, JSON |
-| **Monorepo** | Turborepo + pnpm | latest/9.x | Workspace orchestration, caching |
-| **Testing** | Vitest + Playwright | — | Unit/integration + E2E |
-| **Containers** | Docker (multi-stage) | — | Images < 200MB per service |
-| **Orchestration** | Coolify | 4.x | Self-hosted PaaS, SSL (Let's Encrypt) |
-| **Errors** | Sentry | — | Runtime error capture |
-| **CI/CD** | GitHub Actions | — | Lint → Test → Build → Deploy |
+| Layer                 | Technology                                          | Version    | Role                                                                    |
+| --------------------- | --------------------------------------------------- | ---------- | ----------------------------------------------------------------------- |
+| **Framework**         | Next.js (App Router)                                | 16.2.1     | SSR/RSC for SEO, API routes, Turbopack dev                              |
+| **UI**                | React                                               | 19.x       | Components, Server Components, Hooks, Actions                           |
+| **Canvas**            | @xyflow/react (React Flow)                          | 12.x       | Node/edge rendering, drag-drop, custom nodes                            |
+| **Layout Engine**     | ELK.js (`elkjs`)                                    | latest     | Auto-layout in Web Worker (layered/hierarchical)                        |
+| **Client State**      | Zustand                                             | 5.x        | Editor state, auth, UI — client components only                         |
+| **Server State**      | TanStack Query                                      | 5.x        | Fetch/cache server data (flows, templates)                              |
+| **Validation**        | Zod                                                 | 3.x        | FlowGraph schema, API input/output validation                           |
+| **Styling**           | Vanilla CSS + CSS Modules                           | —          | Design tokens (custom properties), scoped styles                        |
+| **Fonts**             | Google Fonts (Inter)                                | —          | Typography via `next/font/google`                                       |
+| **Realtime CRDT**     | Yjs                                                 | 13.x       | Conflict-free shared FlowGraph state                                    |
+| **Realtime Server**   | Node.js + `ws` + `y-websocket`                      | 22.x LTS   | Standalone WSS for Yjs sync, presence, snapshots                        |
+| **Database**          | PostgreSQL                                          | 16.x       | Users, flows, versions, templates                                       |
+| **Vector Search**     | pgvector                                            | 0.7+       | Semantic template search (cosine similarity)                            |
+| **ORM**               | Drizzle ORM                                         | latest     | Type-safe queries, migrations, schema                                   |
+| **Auth**              | Better Auth                                         | latest     | OAuth (GitHub, Google), email/password, JWT sessions, Drizzle adapter   |
+| **AI Gateway**        | Multi-Provider (OpenRouter, OpenAI, Anthropic, xAI) | —          | Priority-based fallback routing across providers                        |
+| **Embeddings**        | OpenAI `text-embedding-3-small`                     | —          | 1536-dim vectors for template search                                    |
+| **Queue**             | BullMQ                                              | 5.x        | Background jobs: AI generation, export rendering, embedding generation  |
+| **Cache/Queue Store** | Redis (self-hosted via Coolify)                     | 7.x        | Rate limiting, BullMQ backing store, session cache, Yjs snapshot buffer |
+| **Rate Limiting**     | Custom (Redis `INCR` + `EXPIRE`)                    | —          | 10 AI gen/min/user, per-socket WS limits                                |
+| **Export**            | `html-to-image` + `@react-pdf/renderer`             | —          | PNG, SVG, PDF, Mermaid, JSON                                            |
+| **Monorepo**          | Turborepo + pnpm                                    | latest/9.x | Workspace orchestration, caching                                        |
+| **Testing**           | Vitest + Playwright                                 | —          | Unit/integration + E2E                                                  |
+| **Containers**        | Docker (multi-stage)                                | —          | Images < 200MB per service                                              |
+| **Orchestration**     | Coolify                                             | 4.x        | Self-hosted PaaS, SSL (Let's Encrypt)                                   |
+| **Errors**            | Sentry                                              | —          | Runtime error capture                                                   |
+| **CI/CD**             | GitHub Actions                                      | —          | Lint → Test → Build → Deploy                                            |
 
 ---
 
@@ -52,14 +52,14 @@ packages/   → MONOREPO SHARED (core engine, AI pipeline, DB schema — used by
 
 ### Rules
 
-| Rule | Enforcement |
-|---|---|
-| `app/` pages import from `features/` — no domain logic in route files | Code review |
-| Each `features/X/index.ts` is the ONLY public API | No deep imports from outside |
-| `features/` can import from `shared/` and `packages/` | Dependency flows downward |
-| `shared/` NEVER imports from `features/` | Hard boundary |
-| Cross-feature communication via stores, props, or API calls | No circular deps |
-| Zustand stores are client-only | Never in Server Components |
+| Rule                                                                  | Enforcement                  |
+| --------------------------------------------------------------------- | ---------------------------- |
+| `app/` pages import from `features/` — no domain logic in route files | Code review                  |
+| Each `features/X/index.ts` is the ONLY public API                     | No deep imports from outside |
+| `features/` can import from `shared/` and `packages/`                 | Dependency flows downward    |
+| `shared/` NEVER imports from `features/`                              | Hard boundary                |
+| Cross-feature communication via stores, props, or API calls           | No circular deps             |
+| Zustand stores are client-only                                        | Never in Server Components   |
 
 ### Monorepo Structure
 
@@ -335,8 +335,8 @@ CreateFlowChart/
 - [x] **0.10** `.env.example` with all required vars
 - [x] **0.11** Verify `pnpm dev` starts web (3000) + realtime (4000)
 
-
 ### Wiring
+
 ```
 turbo.json orchestrates: packages/* build first → apps/* build second
 pnpm-workspace.yaml links: @createflowchart/core, @createflowchart/ai, @createflowchart/db
@@ -371,8 +371,8 @@ next.config.ts: transpilePackages: ["@createflowchart/core", "@createflowchart/a
   - `runAllRules()` — aggregate
 - [x] **1.5** Unit tests: 100% coverage on schema, transforms (round-trip lossless), every rule
 
-
 ### How It Wires
+
 Every module in the system imports `FlowGraphSchema` from `@createflowchart/core`. Editor serializes to it. API validates against it. AI outputs parse into it. Realtime server snapshots it. Exports render from it.
 
 ---
@@ -393,7 +393,6 @@ Every module in the system imports `FlowGraphSchema` from `@createflowchart/core
 - [x] **2.8** `shared/lib/queue.ts`: BullMQ queue definitions (`ai-generation`, `export-render`, `embedding-generation`)
 - [x] **2.9** `shared/lib/rate-limit.ts`: Redis-based rate limiter using `INCR` + `EXPIRE` (10 AI req/min/user)
 
-
 ### 2C — Editor Feature (`features/editor/`)
 
 - [x] **2.7** `editorStore.ts`: flowGraph, selectedNode/Edge, mode (sandbox|cloud), isDirty, undo/redo stacks. Atomic selectors: `useNodes()`, `useEdges()`, `useSelectedNode()`
@@ -408,7 +407,6 @@ Every module in the system imports `FlowGraphSchema` from `@createflowchart/core
 - [x] **2.16** `CloudEditor.tsx`: auth required, loads from DB, auto-saves (debounced 2s) via API
 - [x] **2.17** Keyboard shortcuts: Ctrl+Z undo, Ctrl+Y redo, Delete remove, / command menu
 
-
 ### 2D — Dashboard Feature (`features/dashboard/`)
 
 - [ ] **2.18** `flow-service.ts`: CRUD calls to `/api/flows`
@@ -416,6 +414,7 @@ Every module in the system imports `FlowGraphSchema` from `@createflowchart/core
 - [ ] **2.20** API routes: `POST/GET /api/flows`, `GET/PUT/DELETE /api/flows/[id]` — thin handlers calling flow-service, Zod validation, Drizzle queries
 
 ### Wiring: Editor ↔ FlowGraph
+
 ```
 User drags node → React Flow onChange → fromReactFlowFormat() → validateFlowGraph()
   → editorStore.setFlowGraph() → toReactFlowFormat() → React Flow re-renders
@@ -444,7 +443,6 @@ User drags node → React Flow onChange → fromReactFlowFormat() → validateFl
 - [x] **3.11** `prompts/explain.ts`: outputs markdown walkthrough
 - [x] **Confidence Scoring**: score per node. AI nodes get LLM score, user nodes = 1.0. <0.7 = yellow glow
 
-
 ### 3B — BullMQ Jobs & Rate Limiting
 
 - [ ] **3.13** `shared/lib/rate-limit.ts`: Redis INCR+EXPIRE, 10/min/user, 429 with Retry-After header
@@ -463,6 +461,7 @@ User drags node → React Flow onChange → fromReactFlowFormat() → validateFl
 - [ ] **3.23** API routes: `POST /api/ai/{generate,analyze,improve,explain}` — auth + rate limit + enqueue BullMQ job
 
 ### Wiring: AI ↔ Editor
+
 ```
 features/ai GenerateModal → /api/ai/generate → @createflowchart/ai pipeline → FlowGraph
   → features/editor editorStore.setFlowGraph() → Canvas renders → useAutoLayout() positions nodes
@@ -483,7 +482,6 @@ features/ai GenerateModal → /api/ai/generate → @createflowchart/ai pipeline 
 - [x] **4.4** `persistence-worker.ts`: BullMQ repeatable job — snapshot changed rooms every 5s → validate → UPDATE Postgres. Final snapshot on room close. Uses `yjs-snapshot` queue
 - [x] **4.5** Per-socket rate limit via Redis: 100 msg/sec, disconnect + 60s ban (Redis sorted set with TTL)
 
-
 ### 4B — Collaboration Feature (`features/collaboration/`)
 
 - [ ] **4.6** `useYjsSync.ts`: connect WebsocketProvider to `wss://realtime.../[flowId]?token=jwt`, bind Yjs↔Zustand↔React Flow, cleanup on unmount
@@ -493,6 +491,7 @@ features/ai GenerateModal → /api/ai/generate → @createflowchart/ai pipeline 
 - [ ] **4.10** `ConnectionStatus.tsx`: 🟢 Connected / 🟡 Reconnecting / 🔴 Disconnected
 
 ### Wiring: Multiplayer
+
 ```
 Browser A: React Flow ↔ Zustand ↔ Yjs Doc (local) ↔ WSS ──┐
                                                             ├─→ Realtime Server (Yjs authority)
@@ -568,13 +567,13 @@ Browser B: React Flow ↔ Zustand ↔ Yjs Doc (local) ↔ WSS ──┘        �
 
 ## Database Schema Summary
 
-| Table | Phase | Columns |
-|---|---|---|
-| `users` | 2 | id (uuid), email, name, avatar_url, created_at |
-| `flows` | 2 | id, user_id (FK), title, data (jsonb), is_public, is_featured, like_count, created_at, updated_at |
-| `flow_versions` | 2 | id, flow_id (FK), data (jsonb), change_summary, version_number, created_at |
-| `templates` | 5 | id, slug (unique), title, description, data (jsonb), category, tags, seo_content, embedding (vector), use_count, timestamps |
-| `flow_likes` | 5 | user_id (FK), flow_id (FK), created_at — unique(user_id, flow_id) |
+| Table           | Phase | Columns                                                                                                                     |
+| --------------- | ----- | --------------------------------------------------------------------------------------------------------------------------- |
+| `users`         | 2     | id (uuid), email, name, avatar_url, created_at                                                                              |
+| `flows`         | 2     | id, user_id (FK), title, data (jsonb), is_public, is_featured, like_count, created_at, updated_at                           |
+| `flow_versions` | 2     | id, flow_id (FK), data (jsonb), change_summary, version_number, created_at                                                  |
+| `templates`     | 5     | id, slug (unique), title, description, data (jsonb), category, tags, seo_content, embedding (vector), use_count, timestamps |
+| `flow_likes`    | 5     | user_id (FK), flow_id (FK), created_at — unique(user_id, flow_id)                                                           |
 
 ---
 
@@ -589,28 +588,195 @@ Browser B: React Flow ↔ Zustand ↔ Yjs Doc (local) ↔ WSS ──┘        �
 7. **Rate limit: 10 AI gen/min/user** — Redis INCR+EXPIRE
 8. **BullMQ for heavy operations** — AI generation, export rendering, embedding generation
 9. **Sandbox flows are private** — localStorage until explicit "Save to Cloud"
-9. **All changes via `dev` branch** — no direct pushes to `main`
-10. **Zustand is client-only** — never in Server Components
-11. **`app/` pages are thin** — max 15 lines, import from `features/`
-12. **`shared/` never imports `features/`** — dependency flows downward only
+10. **All changes via `dev` branch** — no direct pushes to `main`
+11. **Zustand is client-only** — never in Server Components
+12. **`app/` pages are thin** — max 15 lines, import from `features/`
+13. **`shared/` never imports `features/`** — dependency flows downward only
 
 ---
 
 ## Resolved Decisions
 
-| Decision | Choice |
-|---|---|
-| **AI Provider** | Multi-provider with priority-based fallback: OpenRouter, OpenAI, Anthropic, xAI. User-configurable. |
-| **Auth** | Better Auth with Drizzle adapter. GitHub + Google OAuth + email/password. |
-| **Postgres/Redis** | Self-hosted via Coolify. Docker Compose for local dev. |
-| **Job Queue** | BullMQ backed by Redis for AI generation, export rendering, embedding batch jobs. |
-| **Rate Limiting** | Custom Redis-based (`INCR` + `EXPIRE`), no Upstash dependency. |
+| Decision             | Choice                                                                                                 |
+| -------------------- | ------------------------------------------------------------------------------------------------------ |
+| **AI Provider**      | Multi-provider with priority-based fallback: OpenRouter → OpenAI → Anthropic → xAI. User-configurable. |
+| **Auth**             | Better Auth with Drizzle adapter. GitHub + Google OAuth + email/password.                              |
+| **Postgres/Redis**   | Self-hosted via Coolify. Docker Compose for local dev.                                                 |
+| **Job Queue**        | BullMQ backed by Redis for AI generation, export rendering, embedding batch jobs.                      |
+| **Rate Limiting**    | Custom Redis-based (`INCR` + `EXPIRE`), no Upstash dependency.                                         |
+| **Deployment**       | Local dev first. Coolify setup instructions included in Phase G.                                       |
+| **Redis**            | Self-hosted Redis via Coolify (not bundled with web container).                                        |
+| **Error Tracking**   | Sentry managed service (not self-hosted).                                                              |
+| **Template Content** | Start with 5-10 templates, grow organically. Categories determined by web search.                      |
+| **Branding**         | Include logo, favicon, social cards, app icon in Phase H.                                              |
+| **Admin**            | Admin dashboard for moderation, template review queue, analytics included.                             |
 
-## Remaining Open Questions
+---
 
-> [!IMPORTANT]
-> Need your input:
+## Initial Template Categories (Web Research)
 
-1. **Domain**: Is `createflowchart.com` ready on Coolify, or defer deployment?
-2. **Template Content**: AI-generate seed templates, or hand-curate?
-3. **Phase Order**: Current is 0→6 sequential. Skip or reorder any phase?
+Top flowchart template categories based on research:
+
+1. **SaaS Onboarding Flow** — User registration → email verification → profile setup → feature tour → dashboard
+2. **E-commerce Checkout** — Cart → shipping → payment → confirmation → tracking
+3. **User Authentication** — Login → MFA/totp → password reset → session management
+4. **Bug Triage Workflow** — Report submitted → severity assessment → assignment → fix → verify → close
+5. **Content Publishing Pipeline** — Draft → review → edit → approve → schedule → publish → analytics
+6. **Customer Support Escalation** — Ticket → categorize → first response → escalate/resolve → follow-up → close
+7. **Job Application Process** — Apply → resume screening → interview → technical assessment → offer → onboarding
+8. **API Integration Flow** — Authenticate → request → validate → process → response → rate limit handling
+
+---
+
+## Additional Production Features
+
+### Admin Dashboard (`features/admin/`)
+
+- Flow moderation queue (flagged content review)
+- Template submission review
+- User management (ban, verify, role assignment)
+- System health monitoring
+
+### Analytics Dashboard (`features/analytics/`)
+
+- Flow views and creation counts
+- AI generation counts per user/day/week
+- Popular templates and flows
+- User retention metrics
+- API usage and rate limit stats
+
+### Branding Assets (`branding/`)
+
+- Logo (SVG, multiple sizes)
+- Favicon (16x16, 32x32, 48x48, 180x180, 512x512)
+- Social card template (1200x630)
+- App icon (iOS, Android, desktop)
+- OG image generator
+
+---
+
+## Implementation Roadmap
+
+```
+PHASE A: Foundation (Weeks 1-2)
+├── A1.  Create BullMQ worker entry point + workers
+├── A2.  Restructure packages/ai with providers/ directory
+├── A3.  Implement pipeline.ts with Zod validation + auto-repair
+├── A4.  Implement confidence scoring module
+├── A5.  Implement prompts/ with proper prompt engineering
+├── A6.  Create SSE endpoint for job progress
+├── A7.  Update AI routes to enqueue jobs + return jobId
+└── A8.  Add input sanitization to AI endpoints
+
+PHASE B: AI UI + Dashboard (Weeks 2-3)
+├── B1.  Implement features/ai/ service + hooks
+├── B2.  Implement GenerateModal, AnalysisPanel, ImproveDiff, ExplainPanel
+├── B3.  Wire AI components into EditorShell
+├── B4.  Complete flow-service.ts + FlowCard + ImportModal
+└── B5.  Add flow version history API
+
+PHASE C: Realtime Server (Weeks 3-4)
+├── C1.  Implement JWT validation for WS connections
+├── C2.  Implement room-based sync handlers
+├── C3.  Implement awareness protocol
+├── C4.  Implement persistence worker (BullMQ repeatable job)
+└── C5.  Implement per-socket rate limiting
+
+PHASE D: Collaboration UI (Week 4-5)
+├── D1.  Implement useYjsSync, usePresence hooks
+├── D2.  Implement PresenceAvatars, RemoteCursor, ConnectionStatus
+└── D3.  Wire into EditorShell
+
+PHASE E: Templates + Sharing + Gallery (Weeks 5-6)
+├── E1.  Add templates table + flow_likes to DB schema
+├── E2.  Implement template-service with semantic search
+├── E3.  Implement TemplateList, TemplateViewer, TemplateSearch
+├── E4.  Implement ShareModal, PublicFlowView, EmbedView
+├── E5.  Implement GalleryGrid, FlowCard, LikeButton
+├── E6.  Add SEO: JSON-LD, OG tags, sitemap
+└── E7.  Seed 5-10 initial templates
+
+PHASE F: Export + Action Nodes (Weeks 6-7)
+├── F1.  Implement export-worker for PNG/SVG/PDF/Mermaid
+├── F2.  Implement useExport hook + ExportDropdown
+├── F3.  Enhance ActionNode with webhook config + test
+├── F4.  Implement encrypted header storage
+└── F5.  Add action test API endpoint
+
+PHASE G: Docker + CI/CD + Monitoring (Weeks 7-8)
+├── G1.  Create multi-stage Dockerfiles for web + realtime
+├── G2.  Update docker-compose with full stack + pgvector
+├── G3.  Set up GitHub Actions CI pipeline
+├── G4.  Configure Coolify deployment with instructions
+├── G5.  Integrate Sentry (managed service)
+├── G6.  Add health check endpoints
+└── G7.  Set up monitoring dashboards
+
+PHASE H: Admin + Analytics + Branding (Weeks 8-9)
+├── H1.  Admin dashboard with moderation queue
+├── H2.  Template submission review system
+├── H3.  Analytics dashboard with metrics
+├── H4.  Create logo, favicon, app icon assets
+└── H5.  Social card + OG image generator
+
+PHASE I: Polish + Advanced Features (Weeks 9+)
+├── I1.  Virtualization for large flows (>50 nodes)
+├── I2.  Multi-select + group operations
+├── I3.  Keyboard shortcut overlay
+├── I4.  Alignment guides + smart guides
+├── I5.  Node comments threads
+├── I6.  Activity feed per flow
+└── I7.  Performance optimization pass + security audit
+```
+
+---
+
+## Coolify Deployment Checklist
+
+When ready to deploy to Coolify:
+
+### Required Environment Variables
+
+```env
+# Database
+DATABASE_URL=postgresql://user:pass@host:5432/createflowchart
+
+# Redis
+REDIS_URL=redis://host:6379
+
+# Auth (Better Auth)
+BETTER_AUTH_SECRET=your-32-char-secret
+AUTH_GITHUB_ID=xxx
+AUTH_GITHUB_SECRET=xxx
+AUTH_GOOGLE_ID=xxx
+AUTH_GOOGLE_SECRET=xxx
+
+# AI Providers
+OPENROUTER_API_KEY=xxx
+OPENAI_API_KEY=xxx
+ANTHROPIC_API_KEY=xxx
+XAI_API_KEY=xxx
+
+# Encryption (Action Node headers)
+ENCRYPTION_KEY=32-byte-hex-key
+
+# Sentry (managed)
+SENTRY_DSN=https://xxx@sentry.io/xxx
+
+# App
+NEXT_PUBLIC_APP_URL=https://createflowchart.com
+NEXT_PUBLIC_REALTIME_URL=wss://createflowchart.com
+```
+
+### Coolify Services Setup
+
+1. **PostgreSQL 16** — Enable pgvector extension
+2. **Redis 7** — For BullMQ + rate limiting
+3. **web** — Next.js standalone on port 3000
+4. **realtime** — Node.js Yjs server on port 4000
+5. **worker** — BullMQ worker process
+
+### Health Check Endpoints
+
+- `GET /api/health` — Web app health
+- `GET /health` — Realtime server health

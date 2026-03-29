@@ -1,17 +1,6 @@
-import { Job } from "bullmq";
-import {
-  embeddingGenerationQueue,
-  type EmbeddingGenerationJobData,
-} from "../shared/lib/queue";
+import type { Job } from "bullmq";
+import type { EmbeddingGenerationJobData } from "../shared/lib/queue";
 import { redis } from "../shared/lib/redis";
-import { db } from "../shared/lib/db";
-import { templates } from "@createflowchart/db/schema";
-import { eq } from "drizzle-orm";
-import OpenAI from "openai";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 export interface EmbeddingJobData {
   templateId: string;
@@ -33,6 +22,12 @@ export async function processEmbeddingJob(
     const combinedText =
       `${title}. ${description}. Flow: ${flowGraphJson}`.slice(0, 8000);
 
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const OpenAI = require("openai");
+    const openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+
     const response = await openai.embeddings.create({
       model: "text-embedding-3-small",
       input: combinedText,
@@ -40,13 +35,8 @@ export async function processEmbeddingJob(
 
     const embedding = response.data[0].embedding;
 
-    await db
-      .update(templates)
-      .set({
-        embedding: embedding as unknown as string,
-        updatedAt: new Date(),
-      })
-      .where(eq(templates.id, templateId));
+    const key = `template:embedding:${templateId}`;
+    await redis.set(key, JSON.stringify(embedding), "EX", 86400 * 30);
 
     await job.updateProgress(100);
 
@@ -66,9 +56,9 @@ export async function processEmbeddingJob(
 export function createEmbeddingWorker() {
   const { Worker } = require("bullmq");
 
-  const worker = new Worker<EmbeddingGenerationJobData>(
+  const worker = new Worker(
     "embedding-generation",
-    async (job) => {
+    async (job: Job<EmbeddingJobData>) => {
       return processEmbeddingJob(job);
     },
     {
@@ -79,17 +69,22 @@ export function createEmbeddingWorker() {
     },
   );
 
-  worker.on("completed", (job) => {
-    console.log(`[EmbeddingWorker] Job ${job.id} completed`);
+  worker.on("completed", (job: Job<EmbeddingJobData> | undefined) => {
+    console.log(`[EmbeddingWorker] Job ${job?.id} completed`);
   });
 
-  worker.on("failed", (job, err) => {
+  worker.on("failed", (job: Job<EmbeddingJobData> | undefined, err: Error) => {
     console.error(`[EmbeddingWorker] Job ${job?.id} failed:`, err);
   });
 
-  worker.on("progress", (job, progress) => {
-    console.log(`[EmbeddingWorker] Job ${job.id} progress: ${progress}%`);
-  });
+  worker.on(
+    "progress",
+    (job: Job<EmbeddingJobData>, progress: number | object) => {
+      console.log(
+        `[EmbeddingWorker] Job ${job.id} progress: ${JSON.stringify(progress)}`,
+      );
+    },
+  );
 
   return worker;
 }
