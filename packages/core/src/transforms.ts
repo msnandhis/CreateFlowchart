@@ -1,4 +1,4 @@
-import type { FlowGraph, FlowNode, FlowEdge } from "./schema.js";
+import type { FlowGraph, FlowNode, FlowEdge } from "./schema";
 
 // ─── React Flow compatible types ───────────────────────────────────
 export interface RFNode {

@@ -3,7 +3,7 @@ import {
   FlowGraphSchema,
   PartialFlowGraphSchema,
   type FlowGraph,
-} from "./schema.js";
+} from "./schema";
 
 // ─── Result type for validation ────────────────────────────────────
 export type ValidationResult<T> =

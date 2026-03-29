@@ -9,7 +9,7 @@ export {
   FlowMetaSchema,
   FlowGraphSchema,
   PartialFlowGraphSchema,
-} from "./schema.js";
+} from "./schema";
 
 export type {
   NodeType,
@@ -21,7 +21,7 @@ export type {
   FlowMeta,
   FlowGraph,
   PartialFlowGraph,
-} from "./schema.js";
+} from "./schema";
 
 // ─── Validation ────────────────────────────────────────────────────
 export {
@@ -30,9 +30,9 @@ export {
   validatePartial,
   createEmptyFlowGraph,
   createStarterFlowGraph,
-} from "./validation.js";
+} from "./validation";
 
-export type { ValidationResult } from "./validation.js";
+export type { ValidationResult } from "./validation";
 
 // ─── Transforms ────────────────────────────────────────────────────
 export {
@@ -40,9 +40,9 @@ export {
   fromReactFlowFormat,
   toMermaid,
   toJSON,
-} from "./transforms.js";
+} from "./transforms";
 
-export type { RFNode, RFEdge } from "./transforms.js";
+export type { RFNode, RFEdge } from "./transforms";
 
 // ─── Rules Engine ──────────────────────────────────────────────────
 export {
@@ -52,6 +52,6 @@ export {
   validateStartNode,
   validateMaxDepth,
   runAllRules,
-} from "./rules-engine.js";
+} from "./rules-engine";
 
 export type { RuleViolation } from "./rules-engine.js";

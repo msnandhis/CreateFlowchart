@@ -38,6 +38,9 @@ export const metadata: Metadata = {
   },
 };
 
+import { QueryProvider } from "@/shared/providers/QueryProvider";
+import { ToastProvider } from "@/shared/ui/Toast";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -49,7 +52,13 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
-      <body>{children}</body>
+      <body>
+        <QueryProvider>
+          <ToastProvider>
+            {children}
+          </ToastProvider>
+        </QueryProvider>
+      </body>
     </html>
   );
 }

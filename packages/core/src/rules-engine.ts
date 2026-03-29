@@ -1,4 +1,4 @@
-import type { FlowGraph } from "./schema.js";
+import type { FlowGraph } from "./schema";
 
 // ─── Rule Violation ────────────────────────────────────────────────
 export interface RuleViolation {

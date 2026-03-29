@@ -3,7 +3,7 @@
 import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
-import styles from "../styles/nodes.module.css";
+import styles from "../../styles/nodes.module.css";
 
 // ─── Shared base for all nodes ──────────────────────────────────
 interface FlowNodeData {

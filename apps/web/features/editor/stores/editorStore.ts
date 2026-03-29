@@ -30,6 +30,7 @@ interface EditorState {
   setTitle: (title: string) => void;
 
   // React Flow handlers
+  setInitialData: (flow: any) => void;
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: OnConnect;
@@ -65,7 +66,7 @@ function syncFromFlowGraph(fg: FlowGraph): Pick<EditorState, "flowGraph" | "rfNo
 }
 
 function syncFromReactFlow(nodes: Node[], edges: Edge[]): Pick<EditorState, "flowGraph" | "rfNodes" | "rfEdges" | "isDirty"> {
-  const fg = fromReactFlowFormat(nodes, edges);
+  const fg = fromReactFlowFormat(nodes as any, edges as any);
   return { flowGraph: fg, rfNodes: nodes, rfEdges: edges, isDirty: true };
 }
 
@@ -107,6 +108,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   setTitle: (title) => set({ title, isDirty: true }),
+
+  setInitialData: (flow: any) => {
+    const data = typeof flow.data === "string" ? JSON.parse(flow.data) : flow.data;
+    const { nodes, edges } = toReactFlowFormat(data);
+    set({
+      flowGraph: data,
+      rfNodes: nodes,
+      rfEdges: edges,
+      title: flow.title || "Untitled Flow",
+      isDirty: false,
+      undoStack: [],
+      redoStack: [],
+    });
+  },
 
   onNodesChange: (changes) => {
     set((s) => {
