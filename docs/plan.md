@@ -321,19 +321,20 @@ CreateFlowChart/
 
 ### Tasks
 
-- [ ] **0.1** Init pnpm workspace (`pnpm-workspace.yaml`: `apps/*`, `packages/*`)
-- [ ] **0.2** Create `turbo.json` — build pipeline: `packages/core → packages/ai → packages/db → apps/*`
-- [ ] **0.3** Root `package.json` scripts: `dev` (parallel web+realtime), `build`, `lint`, `test`
-- [ ] **0.4** Scaffold Next.js: `npx -y create-next-app@latest ./apps/web` (App Router, TS, ESLint, no Tailwind)
+- [x] **0.1** Init pnpm workspace (`pnpm-workspace.yaml`: `apps/*`, `packages/*`)
+- [x] **0.2** Create `turbo.json` — build pipeline: `packages/core → packages/ai → packages/db → apps/*`
+- [x] **0.3** Root `package.json` scripts: `dev` (parallel web+realtime), `build`, `lint`, `test`
+- [x] **0.4** Scaffold Next.js: `npx -y create-next-app@latest ./apps/web` (App Router, TS, ESLint, no Tailwind)
   - Pin Next.js 16.2.1, configure `next.config.ts` (standalone output, transpilePackages)
   - Create `features/`, `shared/` directories
-- [ ] **0.5** Scaffold `apps/realtime`: package.json with `ws`, `yjs`, `y-protocols`, `jsonwebtoken`
-- [ ] **0.6** Scaffold `packages/core` (Zod), `packages/ai` (OpenAI SDK), `packages/db` (Drizzle + pg), `packages/tsconfig`
-- [ ] **0.7** `docker-compose.yml` for local Postgres 16 (pgvector) + Redis
-- [ ] **0.8** Design tokens in `globals.css` (PRD §11): `--color-primary: #3A86FF`, `--color-bg: #0F1117`, `--color-surface: #1E222D`, etc.
-- [ ] **0.9** ESLint 9 flat config + Prettier across workspaces
-- [ ] **0.10** `.env.example` with all required vars
-- [ ] **0.11** Verify `pnpm dev` starts web (3000) + realtime (4000)
+- [x] **0.5** Scaffold `apps/realtime`: package.json with `ws`, `yjs`, `y-protocols`, `jsonwebtoken`
+- [x] **0.6** Scaffold `packages/core` (Zod), `packages/ai` (OpenAI SDK), `packages/db` (Drizzle + pg), `packages/tsconfig`
+- [x] **0.7** `docker-compose.yml` for local Postgres 16 (pgvector) + Redis
+- [x] **0.8** Design tokens in `globals.css` (PRD §11): `--color-primary: #3A86FF`, `--color-bg: #0F1117`, `--color-surface: #1E222D`, etc.
+- [x] **0.9** ESLint 9 flat config + Prettier across workspaces
+- [x] **0.10** `.env.example` with all required vars
+- [x] **0.11** Verify `pnpm dev` starts web (3000) + realtime (4000)
+
 
 ### Wiring
 ```
@@ -350,7 +351,7 @@ next.config.ts: transpilePackages: ["@createflowchart/core", "@createflowchart/a
 
 ### Tasks
 
-- [ ] **1.1** `schema.ts` — Zod schemas:
+- [x] **1.1** `schema.ts` — Zod schemas:
   - `NodeTypeEnum`: start | process | decision | action | end
   - `ActionConfigSchema`: webhook_url, method, headers, payload_template
   - `NodeDataSchema`: label, confidence (0-1), meta, action (optional)
@@ -359,16 +360,17 @@ next.config.ts: transpilePackages: ["@createflowchart/core", "@createflowchart/a
   - `FlowMetaSchema`: version, createdBy, isSandbox
   - `FlowGraphSchema`: nodes[], edges[], meta
   - Export inferred TypeScript types
-- [ ] **1.2** `validation.ts` — `validateFlowGraph()`, `isValidFlowGraph()`, `validatePartial()`
-- [ ] **1.3** `transforms.ts` — `toReactFlowFormat()`, `fromReactFlowFormat()`, `toMermaid()`, `toJSON()`
-- [ ] **1.4** `rules-engine.ts`:
+- [x] **1.2** `validation.ts` — `validateFlowGraph()`, `isValidFlowGraph()`, `validatePartial()`
+- [x] **1.3** `transforms.ts` — `toReactFlowFormat()`, `fromReactFlowFormat()`, `toMermaid()`, `toJSON()`
+- [x] **1.4** `rules-engine.ts`:
   - `detectDeadEnds()` — nodes with no outgoing edges (except end)
   - `detectLoops()` — DFS cycle detection
   - `validateDecisionNodes()` — must have ≥2 outgoing edges
   - `validateStartNode()` — exactly 1 start, exactly 1 outgoing edge
   - `validateMaxDepth(max=20)` — prevent infinite if-else
   - `runAllRules()` — aggregate
-- [ ] **1.5** Unit tests: 100% coverage on schema, transforms (round-trip lossless), every rule
+- [x] **1.5** Unit tests: 100% coverage on schema, transforms (round-trip lossless), every rule
+
 
 ### How It Wires
 Every module in the system imports `FlowGraphSchema` from `@createflowchart/core`. Editor serializes to it. API validates against it. AI outputs parse into it. Realtime server snapshots it. Exports render from it.
@@ -381,29 +383,31 @@ Every module in the system imports `FlowGraphSchema` from `@createflowchart/core
 
 ### 2A — Database, Auth & Infrastructure
 
-- [ ] **2.1** `packages/db/src/schema.ts`: Drizzle tables for `users`, `sessions`, `accounts`, `flows`, `flow_versions` (Better Auth manages user/session/account tables via its Drizzle adapter)
-- [ ] **2.2** Run initial migration via Drizzle Kit
-- [ ] **2.3** `shared/lib/auth.ts`: Better Auth server instance with Drizzle adapter, GitHub + Google OAuth + email/password. `shared/lib/auth-client.ts`: client-side auth hooks (`useSession`, `signIn`, `signOut`)
-- [ ] **2.4** `app/api/auth/[...all]/route.ts`: catch-all route using `toNextJsHandler(auth)`
-- [ ] **2.5** `features/auth/`: LoginForm, SignupForm, AuthGuard (uses `useSession` from Better Auth client)
-- [ ] **2.6** Auth middleware (`middleware.ts`): protect `/dashboard`, `/editor/[flowId]` routes
-- [ ] **2.7** `shared/lib/redis.ts`: ioredis connection (self-hosted Redis via Coolify, `maxRetriesPerRequest: null`)
-- [ ] **2.8** `shared/lib/queue.ts`: BullMQ queue definitions (`ai-generation`, `export-render`, `embedding-generation`)
-- [ ] **2.9** `shared/lib/rate-limit.ts`: Redis-based rate limiter using `INCR` + `EXPIRE` (10 AI req/min/user)
+- [x] **2.1** `packages/db/src/schema.ts`: Drizzle tables for `users`, `sessions`, `accounts`, `flows`, `flow_versions` (Better Auth manages user/session/account tables via its Drizzle adapter)
+- [x] **2.2** Run initial migration via Drizzle Kit
+- [x] **2.3** `shared/lib/auth.ts`: Better Auth server instance with Drizzle adapter, GitHub + Google OAuth + email/password. `shared/lib/auth-client.ts`: client-side auth hooks (`useSession`, `signIn`, `signOut`)
+- [x] **2.4** `app/api/auth/[...all]/route.ts`: catch-all route using `toNextJsHandler(auth)`
+- [x] **2.5** `features/auth/`: LoginForm, SignupForm, AuthGuard (uses `useSession` from Better Auth client)
+- [x] **2.6** Auth middleware (`middleware.ts`): protect `/dashboard`, `/editor/[flowId]` routes
+- [x] **2.7** `shared/lib/redis.ts`: ioredis connection (self-hosted Redis via Coolify, `maxRetriesPerRequest: null`)
+- [x] **2.8** `shared/lib/queue.ts`: BullMQ queue definitions (`ai-generation`, `export-render`, `embedding-generation`)
+- [x] **2.9** `shared/lib/rate-limit.ts`: Redis-based rate limiter using `INCR` + `EXPIRE` (10 AI req/min/user)
+
 
 ### 2C — Editor Feature (`features/editor/`)
 
-- [ ] **2.7** `editorStore.ts`: flowGraph, selectedNode/Edge, mode (sandbox|cloud), isDirty, undo/redo stacks. Atomic selectors: `useNodes()`, `useEdges()`, `useSelectedNode()`
-- [ ] **2.8** `Canvas.tsx`: React Flow wrapper with custom node types, snap-to-grid (20px), minimap, controls, dark mode
-- [ ] **2.9** Custom nodes (`nodes/`): StartNode (green pill), ProcessNode (blue rect), DecisionNode (diamond), ActionNode (orange rect + webhook icon), EndNode (red pill). Low-confidence (<0.7) → yellow glow
-- [ ] **2.10** `EditorShell.tsx`: layout with Toolbar (top), Sidebar-left (node palette), Sidebar-right (inspector), Canvas (center)
-- [ ] **2.11** `Toolbar.tsx`: undo, redo, zoom, fit, auto-layout, export, share, AI buttons
-- [ ] **2.12** `Sidebar.tsx`: drag-to-add node palette (left), selected node inspector (right)
-- [ ] **2.13** `CommandMenu.tsx` + `useCommandMenu.ts`: "/" keypress → floating palette with fuzzy search. Commands: add node types, auto-layout, generate, analyze, export
-- [ ] **2.14** `useAutoLayout.ts` + `elk-worker.ts`: Web Worker running ELK.js. Toolbar button + auto-run on AI flows
-- [ ] **2.15** `SandboxEditor.tsx` + `useSandboxStorage.ts`: no auth, localStorage persistence (debounced 2s), `meta.isSandbox=true`, banner with sign-in CTA
-- [ ] **2.16** `CloudEditor.tsx`: auth required, loads from DB, auto-saves (debounced 2s) via API
-- [ ] **2.17** Keyboard shortcuts: Ctrl+Z undo, Ctrl+Y redo, Delete remove, / command menu
+- [x] **2.7** `editorStore.ts`: flowGraph, selectedNode/Edge, mode (sandbox|cloud), isDirty, undo/redo stacks. Atomic selectors: `useNodes()`, `useEdges()`, `useSelectedNode()`
+- [x] **2.8** `Canvas.tsx`: React Flow wrapper with custom node types, snap-to-grid (20px), minimap, controls, dark mode
+- [x] **2.9** Custom nodes (`nodes/`): StartNode (green pill), ProcessNode (blue rect), DecisionNode (diamond), ActionNode (orange rect + webhook icon), EndNode (red pill). Low-confidence (<0.7) → yellow glow
+- [x] **2.10** `EditorShell.tsx`: layout with Toolbar (top), Sidebar-left (node palette), Sidebar-right (inspector), Canvas (center)
+- [x] **2.11** `Toolbar.tsx`: undo, redo, zoom, fit, auto-layout, export, share, AI buttons
+- [x] **2.12** `Sidebar.tsx`: drag-to-add node palette (left), selected node inspector (right)
+- [x] **2.13** `CommandMenu.tsx` + `useCommandMenu.ts`: "/" keypress → floating palette with fuzzy search. Commands: add node types, auto-layout, generate, analyze, export
+- [x] **2.14** `useAutoLayout.ts` + `elk-worker.ts`: Web Worker running ELK.js. Toolbar button + auto-run on AI flows
+- [x] **2.15** `SandboxEditor.tsx` + `useSandboxStorage.ts`: no auth, localStorage persistence (debounced 2s), `meta.isSandbox=true`, banner with sign-in CTA
+- [x] **2.16** `CloudEditor.tsx`: auth required, loads from DB, auto-saves (debounced 2s) via API
+- [x] **2.17** Keyboard shortcuts: Ctrl+Z undo, Ctrl+Y redo, Delete remove, / command menu
+
 
 ### 2D — Dashboard Feature (`features/dashboard/`)
 
@@ -427,26 +431,19 @@ User drags node → React Flow onChange → fromReactFlowFormat() → validateFl
 
 ### 3A — Multi-Provider AI System (`packages/ai/`)
 
-- [ ] **3.1** `providers/base.ts`: `AIProviderConfig` interface — `{ name, type (openrouter|openai|anthropic|xai), apiKey, baseUrl, models[] }`
-- [ ] **3.2** `providers/openrouter.ts`: OpenRouter adapter — supports `models[]` array for built-in fallback within OpenRouter
-- [ ] **3.3** `providers/openai.ts`: Direct OpenAI adapter (GPT-4o, o1, etc.)
-- [ ] **3.4** `providers/anthropic.ts`: Direct Anthropic adapter (Claude 3.5/4)
-- [ ] **3.5** `providers/xai.ts`: Direct xAI adapter (Grok)
-- [ ] **3.6** `router.ts`: Priority-based provider routing engine:
-  ```
-  Config: [
-    { provider: "openrouter", models: ["anthropic/claude-4", "openai/gpt-4o"], priority: 1 },
-    { provider: "openai", models: ["gpt-4o"], priority: 2 },
-    { provider: "anthropic", models: ["claude-sonnet-4"], priority: 3 },
-  ]
-  Flow: Try priority 1 → on failure, try priority 2 → on failure, try priority 3 → throw
-  ```
-- [ ] **3.7** `pipeline.ts`: `callLLM()` → router selects provider → JSON response → Zod validate → auto-repair → `Result<FlowGraph, AIError>` (includes `usedProvider` + `usedModel` in response metadata)
-- [ ] **3.8** `prompts/generate.ts`: system prompt with FlowGraph schema + examples + constraints
-- [ ] **3.9** `prompts/analyze.ts`: outputs structured report (dead ends, loops, missing branches)
-- [ ] **3.10** `prompts/improve.ts`: outputs modified FlowGraph + change list
-- [ ] **3.11** `prompts/explain.ts`: outputs markdown walkthrough
-- [ ] **3.12** `confidence.ts`: score per node. AI nodes get LLM score, user nodes = 1.0. <0.7 = yellow glow
+- [x] **3.1** `providers/base.ts`: `AIProviderConfig` interface — `{ name, type (openrouter|openai|anthropic|xai), apiKey, baseUrl, models[] }`
+- [x] **3.2** `providers/openrouter.ts`: OpenRouter adapter — supports `models[]` array for built-in fallback within OpenRouter
+- [x] **3.3** `providers/openai.ts`: Direct OpenAI adapter (GPT-4o, o1, etc.)
+- [x] **3.4** `providers/anthropic.ts`: Direct Anthropic adapter (Claude 3.5/4)
+- [x] **3.5** `providers/xai.ts`: Direct xAI adapter (Grok)
+- [x] **3.6** `router.ts`: Priority-based provider routing engine
+- [x] **3.7** `pipeline.ts`: `callLLM()` → router selects provider → JSON response → Zod validate → auto-repair → `Result<FlowGraph, AIError>` (includes `usedProvider` + `usedModel` in response metadata)
+- [x] **3.8** `prompts/generate.ts`: system prompt with FlowGraph schema + examples + constraints
+- [x] **3.9** `prompts/analyze.ts`: outputs structured report (dead ends, loops, missing branches)
+- [x] **3.10** `prompts/improve.ts`: outputs modified FlowGraph + change list
+- [x] **3.11** `prompts/explain.ts`: outputs markdown walkthrough
+- [x] **Confidence Scoring**: score per node. AI nodes get LLM score, user nodes = 1.0. <0.7 = yellow glow
+
 
 ### 3B — BullMQ Jobs & Rate Limiting
 
@@ -480,11 +477,12 @@ features/ai GenerateModal → /api/ai/generate → @createflowchart/ai pipeline 
 
 ### 4A — Realtime Server (`apps/realtime/`)
 
-- [ ] **4.1** `server.ts`: HTTP + WSS on PORT 4000, `GET /health`, connection upgrade with JWT validation
-- [ ] **4.2** `handlers/sync.ts`: room = flow ID, load FlowGraph from Postgres on first connect, Yjs doc mirrors FlowGraph
-- [ ] **4.3** `handlers/awareness.ts`: presence data (user, cursor {x,y}, selectedNodeId, status active|idle)
-- [ ] **4.4** `persistence-worker.ts`: BullMQ repeatable job — snapshot changed rooms every 5s → validate → UPDATE Postgres. Final snapshot on room close. Uses `yjs-snapshot` queue
-- [ ] **4.5** Per-socket rate limit via Redis: 100 msg/sec, disconnect + 60s ban (Redis sorted set with TTL)
+- [x] **4.1** `server.ts`: HTTP + WSS on PORT 4000, `GET /health`, connection upgrade with JWT validation
+- [x] **4.2** `handlers/sync.ts`: room = flow ID, load FlowGraph from Postgres on first connect, Yjs doc mirrors FlowGraph
+- [x] **4.3** `handlers/awareness.ts`: presence data (user, cursor {x,y}, selectedNodeId, status active|idle)
+- [x] **4.4** `persistence-worker.ts`: BullMQ repeatable job — snapshot changed rooms every 5s → validate → UPDATE Postgres. Final snapshot on room close. Uses `yjs-snapshot` queue
+- [x] **4.5** Per-socket rate limit via Redis: 100 msg/sec, disconnect + 60s ban (Redis sorted set with TTL)
+
 
 ### 4B — Collaboration Feature (`features/collaboration/`)
 
