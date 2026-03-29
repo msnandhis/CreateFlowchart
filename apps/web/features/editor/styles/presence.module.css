@@ -1,0 +1,104 @@
+.avatars {
+  display: flex;
+  align-items: center;
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  border: 2px solid var(--color-surface);
+  margin-left: -8px;
+  cursor: default;
+}
+
+.avatar:first-child {
+  margin-left: 0;
+}
+
+.avatarMore {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-elevated);
+  border: 2px solid var(--color-surface);
+  margin-left: -8px;
+}
+
+.remoteCursor {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1000;
+  transition: transform 0.1s ease-out;
+}
+
+.remoteCursor svg {
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.cursorLabel {
+  position: absolute;
+  top: 18px;
+  left: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 500;
+  color: white;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.cursorsContainer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.connectionStatus {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+}
+
+.connectionStatus.connected {
+  color: var(--color-success);
+}
+
+.connectionStatus.connecting {
+  color: var(--color-warning);
+}
+
+.connectionStatus.disconnected {
+  color: var(--color-error);
+}
+
+.statusIcon {
+  font-size: 10px;
+}
+
+.statusLabel {
+  color: inherit;
+}
