@@ -14,14 +14,14 @@ import {
   type EngineSelection,
   type EngineState,
 } from "@createflowchart/engine";
-import type { DiagramDocument } from "@createflowchart/schema";
+import type { DiagramDocument, DiagramFamily } from "@createflowchart/schema";
 import type { Edge, Node } from "@xyflow/react";
 import {
   documentToFlowGraph,
   documentToReactFlow,
   reactFlowToDocument,
 } from "./document-compat";
-import { getPaletteItemByShapeId } from "./flowchart-shapes";
+import { getPaletteItemByShapeId, getShapeDefinition } from "./flowchart-shapes";
 import type { ActionConfig } from "@createflowchart/core";
 
 export interface EditorProjection {
@@ -76,10 +76,16 @@ export function addLegacyNode(
       ? node.data.meta.shapeId
       : undefined;
   const paletteItem = shapeId ? getPaletteItemByShapeId(shapeId) : null;
+  const shapeDefinition = shapeId ? getShapeDefinition(shapeId) : null;
 
   const nextState = addDocumentNode(engineState, {
     id: node.id,
-    family: "flowchart",
+    family:
+      asDiagramFamily(
+        typeof node.data.meta.family === "string" ? node.data.meta.family : undefined,
+      ) ??
+      paletteItem?.family ??
+      "flowchart",
     kind:
       (typeof node.data.meta.semanticKind === "string"
         ? node.data.meta.semanticKind
@@ -101,20 +107,63 @@ export function addLegacyNode(
           ? "action-task"
           : node.type === "process"
             ? "process"
-            : "terminator"),
+            : node.type === "start"
+              ? "terminator-start"
+              : "terminator-end"),
     position: node.position,
     size: {
-      width: paletteItem?.defaultSize.width ?? 180,
-      height: paletteItem?.defaultSize.height ?? (node.type === "decision" ? 120 : 64),
+      width: shapeDefinition?.defaultWidth ?? paletteItem?.defaultSize.width ?? 180,
+      height:
+        shapeDefinition?.defaultHeight ??
+        paletteItem?.defaultSize.height ??
+        (node.type === "decision" ? 120 : 64),
     },
-    ports: [],
+    ports:
+      shapeDefinition?.portAnchors.map((anchor) => ({
+        id: anchor.id,
+        side: anchor.side,
+        metadata: {
+          anchor,
+        },
+        accepts: [],
+      })) ?? [],
     content: {
       title: node.data.label,
       labels: [],
     },
     style: { tokens: {} },
-    resizePolicy: "content",
-    metadata: node.data.meta,
+    resizePolicy: shapeDefinition?.resizePolicy ?? "content",
+    metadata: {
+      ...node.data.meta,
+      shapeId:
+        shapeId ??
+        (node.type === "decision"
+          ? "decision"
+          : node.type === "action"
+            ? "action-task"
+            : node.type === "process"
+              ? "process"
+              : node.type === "start"
+                ? "terminator-start"
+                : "terminator-end"),
+      semanticKind:
+        (typeof node.data.meta.semanticKind === "string"
+          ? node.data.meta.semanticKind
+          : paletteItem?.kind) ??
+        (node.type === "start"
+          ? "start-event"
+          : node.type === "end"
+            ? "end-event"
+            : node.type === "decision"
+              ? "decision-gateway"
+              : node.type === "action"
+                ? "automation-task"
+                : "process-step"),
+      family:
+        (typeof node.data.meta.family === "string" ? node.data.meta.family : undefined) ??
+        paletteItem?.family ??
+        "flowchart",
+    },
     automation: node.data.action
       ? {
           actionType: "http",
@@ -159,10 +208,12 @@ export function updateDocumentNodeShape(
   shapeId: string,
 ): EditorProjection {
   const paletteItem = getPaletteItemByShapeId(shapeId);
+  const shapeDefinition = getShapeDefinition(shapeId);
 
   return projectEngineState(
     updateDocumentNode(engineState, nodeId, (node) => ({
       ...node,
+      family: paletteItem?.family ?? node.family,
       shape: shapeId,
       kind: paletteItem?.kind ?? node.kind,
       size: paletteItem
@@ -171,10 +222,21 @@ export function updateDocumentNodeShape(
             height: paletteItem.defaultSize.height,
           }
         : node.size,
+      ports:
+        shapeDefinition?.portAnchors.map((anchor) => ({
+          id: anchor.id,
+          side: anchor.side,
+          metadata: {
+            anchor,
+          },
+          accepts: [],
+        })) ?? node.ports,
+      resizePolicy: shapeDefinition?.resizePolicy ?? node.resizePolicy,
       metadata: {
         ...node.metadata,
         shapeId,
         semanticKind: paletteItem?.kind ?? node.kind,
+        family: paletteItem?.family ?? node.family,
       },
     })),
   );
@@ -253,4 +315,29 @@ export function selectEdgeInEngine(
   id: string | null,
 ): EngineSelection {
   return id ? selectEdge(id) : clearSelection();
+}
+
+const DIAGRAM_FAMILIES: DiagramFamily[] = [
+  "flowchart",
+  "bpmn",
+  "swimlane",
+  "sequence",
+  "state",
+  "er",
+  "class",
+  "c4",
+  "architecture",
+  "dataflow",
+  "mindmap",
+  "orgchart",
+  "timeline",
+  "journey",
+  "sankey",
+  "custom",
+];
+
+function asDiagramFamily(value: string | undefined): DiagramFamily | undefined {
+  return value && DIAGRAM_FAMILIES.includes(value as DiagramFamily)
+    ? (value as DiagramFamily)
+    : undefined;
 }

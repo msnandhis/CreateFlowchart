@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { NodeType } from "@createflowchart/core";
-import { flowchartPalette } from "../lib/flowchart-shapes";
+import { diagramPalette } from "../lib/flowchart-shapes";
 
 interface Command {
   id: string;
@@ -45,10 +44,10 @@ export function useCommandMenu({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const addCommands: Command[] = flowchartPalette.map((item) => ({
+  const addCommands: Command[] = diagramPalette.map((item) => ({
     id: `add-${item.shapeId}`,
     label: `Add ${item.label}`,
-    description: item.description,
+    description: `${item.family.toUpperCase()} · ${item.description}`,
     icon: item.icon,
     category: "add",
     action: () => onAddNode(item.shapeId),

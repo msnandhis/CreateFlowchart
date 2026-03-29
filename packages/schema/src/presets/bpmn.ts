@@ -14,7 +14,7 @@ export const bpmnLiteShapes: ShapeDefinition[] = [
     labelZones: [{ id: "main", x: 0.2, y: 0.2, width: 0.6, height: 0.6 }],
     defaultTokens: {},
     tags: ["bpmn", "event"],
-    metadata: { icon: "○", renderVariant: "connector" },
+    metadata: { icon: "○", legacyType: "start", renderVariant: "connector", geometry: "circle" },
   },
   {
     id: "bpmn-end-event",
@@ -29,7 +29,7 @@ export const bpmnLiteShapes: ShapeDefinition[] = [
     labelZones: [{ id: "main", x: 0.2, y: 0.2, width: 0.6, height: 0.6 }],
     defaultTokens: {},
     tags: ["bpmn", "event"],
-    metadata: { icon: "◉", renderVariant: "connector" },
+    metadata: { icon: "◉", legacyType: "end", renderVariant: "connector", geometry: "circle" },
   },
   {
     id: "bpmn-task",
@@ -47,7 +47,7 @@ export const bpmnLiteShapes: ShapeDefinition[] = [
     labelZones: [{ id: "main", x: 0.12, y: 0.2, width: 0.76, height: 0.56 }],
     defaultTokens: {},
     tags: ["bpmn", "task"],
-    metadata: { icon: "▢", renderVariant: "process" },
+    metadata: { icon: "▢", legacyType: "process", renderVariant: "process", geometry: "rect" },
   },
   {
     id: "bpmn-user-task",
@@ -65,7 +65,7 @@ export const bpmnLiteShapes: ShapeDefinition[] = [
     labelZones: [{ id: "main", x: 0.12, y: 0.2, width: 0.76, height: 0.56 }],
     defaultTokens: {},
     tags: ["bpmn", "task", "user"],
-    metadata: { icon: "👤", renderVariant: "process" },
+    metadata: { icon: "👤", legacyType: "process", renderVariant: "process", geometry: "rect" },
   },
   {
     id: "bpmn-service-task",
@@ -83,7 +83,25 @@ export const bpmnLiteShapes: ShapeDefinition[] = [
     labelZones: [{ id: "main", x: 0.12, y: 0.2, width: 0.76, height: 0.56 }],
     defaultTokens: {},
     tags: ["bpmn", "task", "service"],
-    metadata: { icon: "⚙", renderVariant: "action" },
+    metadata: { icon: "⚙", legacyType: "action", renderVariant: "action", geometry: "rect" },
+  },
+  {
+    id: "bpmn-subprocess",
+    family: "bpmn",
+    kind: "subprocess",
+    displayName: "Subprocess",
+    description: "Collapsed BPMN subprocess",
+    defaultWidth: 196,
+    defaultHeight: 88,
+    resizePolicy: "content",
+    portAnchors: [
+      { id: "in", side: "top", x: 0.5, y: 0 },
+      { id: "out", side: "bottom", x: 0.5, y: 1 },
+    ],
+    labelZones: [{ id: "main", x: 0.14, y: 0.22, width: 0.72, height: 0.5 }],
+    defaultTokens: {},
+    tags: ["bpmn", "subprocess"],
+    metadata: { icon: "▤", legacyType: "process", renderVariant: "process", geometry: "subprocess" },
   },
   {
     id: "bpmn-exclusive-gateway",
@@ -102,7 +120,7 @@ export const bpmnLiteShapes: ShapeDefinition[] = [
     labelZones: [{ id: "main", x: 0.22, y: 0.28, width: 0.56, height: 0.44 }],
     defaultTokens: {},
     tags: ["bpmn", "gateway"],
-    metadata: { icon: "✕", renderVariant: "decision" },
+    metadata: { icon: "✕", legacyType: "decision", renderVariant: "decision", geometry: "diamond" },
   },
   {
     id: "bpmn-parallel-gateway",
@@ -121,7 +139,26 @@ export const bpmnLiteShapes: ShapeDefinition[] = [
     labelZones: [{ id: "main", x: 0.22, y: 0.28, width: 0.56, height: 0.44 }],
     defaultTokens: {},
     tags: ["bpmn", "gateway"],
-    metadata: { icon: "+", renderVariant: "decision" },
+    metadata: { icon: "+", legacyType: "decision", renderVariant: "decision", geometry: "diamond" },
+  },
+  {
+    id: "bpmn-inclusive-gateway",
+    family: "bpmn",
+    kind: "inclusive-gateway",
+    displayName: "Inclusive Gateway",
+    description: "Inclusive branching gateway",
+    defaultWidth: 160,
+    defaultHeight: 112,
+    resizePolicy: "content",
+    portAnchors: [
+      { id: "in", side: "top", x: 0.5, y: 0 },
+      { id: "out-right", side: "right", x: 1, y: 0.5 },
+      { id: "out-bottom", side: "bottom", x: 0.5, y: 1 },
+    ],
+    labelZones: [{ id: "main", x: 0.22, y: 0.28, width: 0.56, height: 0.44 }],
+    defaultTokens: {},
+    tags: ["bpmn", "gateway"],
+    metadata: { icon: "◌", legacyType: "decision", renderVariant: "decision", geometry: "diamond" },
   },
   {
     id: "bpmn-pool",
@@ -136,7 +173,7 @@ export const bpmnLiteShapes: ShapeDefinition[] = [
     labelZones: [{ id: "main", x: 0.02, y: 0.1, width: 0.08, height: 0.8 }],
     defaultTokens: {},
     tags: ["bpmn", "container"],
-    metadata: { icon: "▥", renderVariant: "process" },
+    metadata: { icon: "▥", legacyType: "process", renderVariant: "process", geometry: "pool" },
   },
   {
     id: "bpmn-lane",
@@ -151,7 +188,7 @@ export const bpmnLiteShapes: ShapeDefinition[] = [
     labelZones: [{ id: "main", x: 0.02, y: 0.1, width: 0.08, height: 0.8 }],
     defaultTokens: {},
     tags: ["bpmn", "container"],
-    metadata: { icon: "▤", renderVariant: "process" },
+    metadata: { icon: "▤", legacyType: "process", renderVariant: "process", geometry: "lane" },
   },
 ];
 

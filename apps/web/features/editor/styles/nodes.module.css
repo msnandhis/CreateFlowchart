@@ -1,20 +1,22 @@
 /* ═══════════════════════════════════════════════════════════════════
-   Custom Node Styles — Clean, minimal, dark-mode
+   Document-Driven Node Styles
    ═══════════════════════════════════════════════════════════════════ */
 
 .node {
   padding: 10px 18px;
-  border-radius: var(--radius-lg);
   border: 2px solid;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   color: var(--color-text-primary);
   background: var(--color-surface);
-  min-width: 140px;
   text-align: center;
   transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
   cursor: grab;
   position: relative;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  overflow: visible;
 }
 
 .node:hover {
@@ -29,68 +31,73 @@
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* ─── Node Types ────────────────────────────────────────────────── */
-.startNode {
+.startTone {
   border-color: var(--color-node-start);
-  border-radius: var(--radius-full);
   background: linear-gradient(135deg, var(--color-surface) 0%, rgba(52, 211, 153, 0.08) 100%);
 }
 
-.processNode {
+.processTone {
   border-color: var(--color-node-process);
   background: linear-gradient(135deg, var(--color-surface) 0%, rgba(58, 134, 255, 0.08) 100%);
 }
 
-.decisionNode {
+.decisionTone {
   border-color: var(--color-node-decision);
-  transform: rotate(45deg);
-  min-width: 90px;
-  min-height: 90px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  border-radius: var(--radius-md);
   background: linear-gradient(135deg, var(--color-surface) 0%, rgba(167, 139, 250, 0.08) 100%);
 }
 
-.decisionLabel {
-  transform: rotate(-45deg);
-  white-space: nowrap;
-}
-
-.actionNode {
+.actionTone {
   border-color: var(--color-node-action);
   background: linear-gradient(135deg, var(--color-surface) 0%, rgba(251, 146, 60, 0.08) 100%);
 }
 
-.endNode {
+.endTone {
   border-color: var(--color-node-end);
-  border-radius: var(--radius-full);
   background: linear-gradient(135deg, var(--color-surface) 0%, rgba(248, 113, 113, 0.08) 100%);
 }
 
-/* ─── Type Icon ─────────────────────────────────────────────────── */
 .nodeIcon {
   position: absolute;
   top: -8px;
   left: -8px;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: var(--radius-full);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 10px;
+  z-index: 2;
 }
 
-.startIcon { background: var(--color-node-start); color: var(--color-bg); }
-.processIcon { background: var(--color-node-process); color: white; }
-.decisionIcon { background: var(--color-node-decision); color: white; transform: rotate(-45deg); }
-.actionIcon { background: var(--color-node-action); color: white; }
-.endIcon { background: var(--color-node-end); color: white; }
+.nodeIcon.startTone { background: var(--color-node-start); color: var(--color-bg); }
+.nodeIcon.processTone { background: var(--color-node-process); color: white; }
+.nodeIcon.decisionTone { background: var(--color-node-decision); color: white; }
+.nodeIcon.actionTone { background: var(--color-node-action); color: white; }
+.nodeIcon.endTone { background: var(--color-node-end); color: white; }
 
-/* ─── Confidence Badge ──────────────────────────────────────────── */
+.nodeContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 4px 8px;
+}
+
+.nodeLabel {
+  line-height: 1.2;
+}
+
+.nodeCaption {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.72;
+}
+
 .confidenceBadge {
   position: absolute;
   bottom: -8px;
@@ -104,8 +111,94 @@
   border: 1px solid rgba(255, 214, 10, 0.3);
 }
 
-/* ─── Handle (connection point) ─────────────────────────────────── */
+.geometryRect {
+  border-radius: var(--radius-lg);
+}
 
+.geometryPill {
+  border-radius: 999px;
+}
+
+.geometryDiamond {
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.geometryDiamond .nodeContent {
+  width: 60%;
+  margin: 0 auto;
+}
+
+.geometryParallelogram {
+  clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%);
+}
+
+.geometryParallelogram .nodeContent {
+  transform: skew(10deg);
+}
+
+.geometryDocument {
+  clip-path: polygon(0 0, 100% 0, 100% 84%, 78% 100%, 50% 88%, 24% 100%, 0 84%);
+}
+
+.geometryMultiDocument {
+  clip-path: polygon(0 0, 100% 0, 100% 84%, 78% 100%, 50% 88%, 24% 100%, 0 84%);
+  box-shadow: -6px 6px 0 rgba(255, 255, 255, 0.06);
+}
+
+.geometryCylinder {
+  border-radius: 999px / 18px;
+}
+
+.geometrySubprocess,
+.geometryPredefinedProcess {
+  border-radius: var(--radius-lg);
+  box-shadow:
+    inset 8px 0 0 rgba(255, 255, 255, 0.08),
+    inset -8px 0 0 rgba(255, 255, 255, 0.08);
+}
+
+.geometryManualInput {
+  clip-path: polygon(12% 0, 100% 0, 88% 100%, 0 100%);
+}
+
+.geometryDisplay {
+  clip-path: polygon(0 10%, 84% 10%, 100% 50%, 84% 90%, 0 90%, 8% 50%);
+}
+
+.geometryHexagon {
+  clip-path: polygon(12% 0, 88% 0, 100% 50%, 88% 100%, 12% 100%, 0 50%);
+}
+
+.geometryDelay {
+  clip-path: polygon(0 0, 84% 0, 100% 50%, 84% 100%, 0 100%);
+}
+
+.geometryCircle {
+  border-radius: 999px;
+}
+
+.geometryOffPageConnector {
+  clip-path: polygon(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%);
+}
+
+.geometryStoredData {
+  border-top-left-radius: 18px;
+  border-bottom-left-radius: 18px;
+  box-shadow: inset 10px 0 0 rgba(255, 255, 255, 0.08);
+}
+
+.geometryPool,
+.geometryLane {
+  border-radius: var(--radius-lg);
+  justify-content: flex-start;
+}
+
+.geometryPool .nodeContent,
+.geometryLane .nodeContent {
+  align-items: flex-start;
+  text-align: left;
+  padding-left: 18px;
+}
 
 @keyframes pulse-glow {
   0%, 100% { box-shadow: 0 0 4px rgba(255, 214, 10, 0.2); }

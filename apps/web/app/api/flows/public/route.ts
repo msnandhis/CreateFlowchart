@@ -64,7 +64,7 @@ export async function GET(req: Request) {
     userLikedFlowIds = new Set(userLikes.map((l) => l.flowId));
   }
 
-  const flowsWithAuthor: FlowWithAuthor[] = results.map((f) => ({
+  const flowsWithAuthor: FlowWithAuthor[] = results.map((f) => {
     const normalized = normalizePersistedFlow({
       data: typeof f.data === "string" ? JSON.parse(f.data) : f.data,
       id: f.id,

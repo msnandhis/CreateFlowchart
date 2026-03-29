@@ -45,6 +45,7 @@ export function isPersistedFlowEnvelope(value: unknown): value is PersistedFlowE
 
 export function normalizePersistedFlow(input: {
   data: unknown;
+  document?: unknown;
   id?: string;
   title?: string;
   authorId?: string;
@@ -55,6 +56,7 @@ export function normalizePersistedFlow(input: {
 
   return createPersistedFlowEnvelope({
     data: input.data,
+    document: input.document,
     id: input.id,
     title: input.title,
     authorId: input.authorId,

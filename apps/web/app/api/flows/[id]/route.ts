@@ -123,12 +123,27 @@ export async function PATCH(
       return NextResponse.json({ error: "Flow not found or unauthorized" }, { status: 404 });
     }
 
+    const persisted = normalizePersistedFlow({
+      data:
+        typeof result[0].data === "string"
+          ? JSON.parse(result[0].data)
+          : result[0].data,
+      id: result[0].id,
+      title: result[0].title,
+      authorId: result[0].userId,
+    });
+
     return NextResponse.json({
       success: true,
-      flow: result[0],
-      document: normalized?.document,
-      data: normalized?.legacy,
-      formatVersion: normalized?.formatVersion ?? "flowgraph-v1+document-v2",
+      flow: {
+        ...result[0],
+        data: persisted.legacy,
+        document: persisted.document,
+        formatVersion: persisted.formatVersion,
+      },
+      document: persisted.document,
+      data: persisted.legacy,
+      formatVersion: persisted.formatVersion,
     });
   } catch (error: any) {
     console.error("[Flow Update Error]:", error);

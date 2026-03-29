@@ -11,7 +11,7 @@ export interface LegacyFlowGraph {
       meta: Record<string, unknown>;
       action?: {
         webhook_url: string;
-        method: "GET" | "POST" | "PUT" | "DELETE";
+        method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
         headers: Record<string, string>;
         payload_template?: string;
       };
@@ -34,7 +34,7 @@ export interface LegacyFlowGraph {
 function inferShape(type: LegacyFlowGraph["nodes"][number]["type"]): string {
   switch (type) {
     case "start":
-      return "terminator";
+      return "terminator-start";
     case "process":
       return "process";
     case "decision":
@@ -42,7 +42,7 @@ function inferShape(type: LegacyFlowGraph["nodes"][number]["type"]): string {
     case "action":
       return "action-task";
     case "end":
-      return "terminator";
+      return "terminator-end";
     default:
       return "process";
   }

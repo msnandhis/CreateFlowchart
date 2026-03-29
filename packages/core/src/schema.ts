@@ -13,7 +13,7 @@ export type NodeType = z.infer<typeof NodeTypeEnum>;
 // ─── Action Config (for Action Nodes — webhook/API triggers) ──────
 export const ActionConfigSchema = z.object({
   webhook_url: z.string().url(),
-  method: z.enum(["GET", "POST", "PUT", "DELETE"]).default("POST"),
+  method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).default("POST"),
   headers: z.record(z.string()).default({}),
   payload_template: z.string().optional(),
 });

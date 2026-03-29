@@ -19,7 +19,23 @@ export async function GET(req: Request) {
     orderBy: [desc(flows.updatedAt)],
   });
 
-  return NextResponse.json(userFlows);
+  return NextResponse.json(
+    userFlows.map((flow) => {
+      const normalized = normalizePersistedFlow({
+        data: typeof flow.data === "string" ? JSON.parse(flow.data) : flow.data,
+        id: flow.id,
+        title: flow.title,
+        authorId: flow.userId,
+      });
+
+      return {
+        ...flow,
+        data: normalized.legacy,
+        document: normalized.document,
+        formatVersion: normalized.formatVersion,
+      };
+    }),
+  );
 }
 
 /**

@@ -20,7 +20,7 @@ export function ActionNodeConfigPanel({
   onCancel,
 }: ActionNodeConfigPanelProps) {
   const [webhookUrl, setWebhookUrl] = useState(config?.webhook_url || "");
-  const [method, setMethod] = useState<"GET" | "POST" | "PUT" | "DELETE">(
+  const [method, setMethod] = useState<"GET" | "POST" | "PUT" | "PATCH" | "DELETE">(
     config?.method || "POST",
   );
   const [headers, setHeaders] = useState<Record<string, string>>(
@@ -121,6 +121,7 @@ export function ActionNodeConfigPanel({
             <option value="GET">GET</option>
             <option value="POST">POST</option>
             <option value="PUT">PUT</option>
+            <option value="PATCH">PATCH</option>
             <option value="DELETE">DELETE</option>
           </select>
         </div>

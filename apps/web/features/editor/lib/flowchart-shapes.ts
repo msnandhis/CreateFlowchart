@@ -1,8 +1,16 @@
 import type { NodeType, FlowNode } from "@createflowchart/core";
-import { flowchartShapes, type ShapeDefinition } from "@createflowchart/schema";
+import {
+  bpmnLiteShapes,
+  flowchartShapes,
+  type DiagramFamily,
+  type ShapeDefinition,
+} from "@createflowchart/schema";
 
 export interface FlowchartPaletteItem {
   shapeId: string;
+  family: DiagramFamily;
+  kit: string;
+  geometry: string;
   kind: string;
   legacyType: NodeType;
   label: string;
@@ -19,6 +27,9 @@ function mapShapeToPaletteItem(shape: ShapeDefinition): FlowchartPaletteItem {
 
   return {
     shapeId: shape.id,
+    family: shape.family,
+    kit: shape.family === "bpmn" ? "bpmn-lite" : "core-flowchart",
+    geometry: (metadata.geometry as string | undefined) ?? "rect",
     kind: shape.kind,
     legacyType: (metadata.legacyType as NodeType | undefined) ?? "process",
     label: shape.displayName,
@@ -31,18 +42,43 @@ function mapShapeToPaletteItem(shape: ShapeDefinition): FlowchartPaletteItem {
   };
 }
 
+const shapeLibrary = [...flowchartShapes, ...bpmnLiteShapes];
+
+export const diagramPalette: FlowchartPaletteItem[] =
+  shapeLibrary.map(mapShapeToPaletteItem);
+
 export const flowchartPalette: FlowchartPaletteItem[] =
-  flowchartShapes.map(mapShapeToPaletteItem);
+  diagramPalette.filter((item) => item.family === "flowchart");
+
+export const bpmnPalette: FlowchartPaletteItem[] =
+  diagramPalette.filter((item) => item.family === "bpmn");
+
+export const paletteSections: Array<{
+  id: string;
+  title: string;
+  items: FlowchartPaletteItem[];
+}> = [
+  { id: "flowchart", title: "Flowchart Shapes", items: flowchartPalette },
+  { id: "bpmn", title: "BPMN Lite", items: bpmnPalette },
+];
+
+export const shapeDefinitionMap: Record<string, ShapeDefinition> = Object.fromEntries(
+  shapeLibrary.map((shape) => [shape.id, shape]),
+);
 
 export function getPaletteItem(type: NodeType): FlowchartPaletteItem {
   return (
-    flowchartPalette.find((item) => item.legacyType === type) ??
-    flowchartPalette[1]
+    diagramPalette.find((item) => item.legacyType === type) ??
+    diagramPalette[1]
   );
 }
 
 export function getPaletteItemByShapeId(shapeId: string): FlowchartPaletteItem | null {
-  return flowchartPalette.find((item) => item.shapeId === shapeId) ?? null;
+  return diagramPalette.find((item) => item.shapeId === shapeId) ?? null;
+}
+
+export function getShapeDefinition(shapeId: string): ShapeDefinition | null {
+  return shapeDefinitionMap[shapeId] ?? null;
 }
 
 export function createLegacyPaletteNode(
@@ -67,6 +103,9 @@ export function createLegacyPaletteNode(
         paletteSource: item.shapeId,
         shapeId: item.shapeId,
         semanticKind: item.kind,
+        family: item.family,
+        kit: item.kit,
+        geometry: item.geometry,
       },
     },
   };

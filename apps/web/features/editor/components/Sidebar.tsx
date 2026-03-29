@@ -9,8 +9,8 @@ import { Input } from "@/shared/ui/Input";
 import styles from "../styles/sidebar.module.css";
 import {
   createLegacyPaletteNode,
-  flowchartPalette,
   getPaletteItemByShapeId,
+  paletteSections,
 } from "../lib/flowchart-shapes";
 import { ActionNodeConfigPanel } from "./ActionNodeConfigPanel";
 
@@ -48,12 +48,28 @@ export function Sidebar() {
                 onChange={(e) => updateNodeShape(selectedNode.id, e.target.value)}
                 className={styles.select}
               >
-                {flowchartPalette.map((item) => (
-                  <option key={item.shapeId} value={item.shapeId}>
-                    {item.label}
-                  </option>
+                {paletteSections.map((section) => (
+                  <optgroup key={section.id} label={section.title}>
+                    {section.items.map((item) => (
+                      <option key={item.shapeId} value={item.shapeId}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
+            </div>
+            <div style={{ marginTop: "1rem" }}>
+              <div className={styles.sectionTitle}>Diagram Family</div>
+              <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+                {selectedShape?.family ?? selectedNode.family}
+              </div>
+            </div>
+            <div style={{ marginTop: "1rem" }}>
+              <div className={styles.sectionTitle}>Kit</div>
+              <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+                {selectedShape?.kit ?? "core-flowchart"}
+              </div>
             </div>
             <div style={{ marginTop: "1rem" }}>
               <div className={styles.sectionTitle}>Shape</div>
@@ -71,6 +87,12 @@ export function Sidebar() {
               <div className={styles.sectionTitle}>Family</div>
               <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
                 {selectedNode.family}
+              </div>
+            </div>
+            <div style={{ marginTop: "1rem" }}>
+              <div className={styles.sectionTitle}>Geometry</div>
+              <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+                {selectedShape?.geometry ?? "rect"}
               </div>
             </div>
             <div style={{ marginTop: "1rem" }}>
@@ -101,6 +123,18 @@ export function Sidebar() {
                 className={styles.titleInput}
               />
             </div>
+            <div style={{ marginTop: "1rem" }}>
+              <div className={styles.sectionTitle}>Resize Policy</div>
+              <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+                {selectedNode.resizePolicy}
+              </div>
+            </div>
+            <div style={{ marginTop: "1rem" }}>
+              <div className={styles.sectionTitle}>Ports</div>
+              <div style={{ fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)" }}>
+                {selectedNode.ports.length}
+              </div>
+            </div>
             {selectedNode.ai?.confidence !== undefined && (
               <div style={{ marginTop: "1rem" }}>
                 <div className={styles.sectionTitle}>Confidence</div>
@@ -119,6 +153,14 @@ export function Sidebar() {
                 >
                   Configure Automation
                 </button>
+                {selectedNode.automation?.endpoint ? (
+                  <div style={{ marginTop: "0.75rem", fontSize: "var(--font-size-xs)", color: "var(--color-text-secondary)" }}>
+                    <div>{selectedNode.automation.method ?? "POST"} {selectedNode.automation.endpoint}</div>
+                    {selectedNode.automation.payloadTemplate ? (
+                      <div style={{ marginTop: "0.375rem" }}>Payload template attached</div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
@@ -131,20 +173,24 @@ export function Sidebar() {
         <div className={styles.separator} />
 
         <div className={styles.section}>
-          <div className={styles.sectionTitle}>Add Nodes</div>
-          <div className={styles.nodeList}>
-            {flowchartPalette.map((item) => (
-              <button
-                key={item.legacyType}
-                type="button"
-                className={styles.draggableNode}
-                onClick={() => addNode(createLegacyPaletteNode(item.legacyType))}
-                title={item.description}
-              >
-                {item.icon} {item.label}
-              </button>
-            ))}
-          </div>
+          {paletteSections.map((section) => (
+            <div key={section.id} style={{ marginBottom: "1rem" }}>
+              <div className={styles.sectionTitle}>{section.title}</div>
+              <div className={styles.nodeList}>
+                {section.items.map((item) => (
+                  <button
+                    key={item.shapeId}
+                    type="button"
+                    className={styles.draggableNode}
+                    onClick={() => addNode(createLegacyPaletteNode(item.shapeId))}
+                    title={item.description}
+                  >
+                    {item.icon} {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
       {selectedNode && showAutomationConfig && (
@@ -154,10 +200,7 @@ export function Sidebar() {
             selectedNode.automation?.endpoint
               ? {
                   webhook_url: selectedNode.automation.endpoint,
-                  method:
-                    selectedNode.automation.method === "PATCH"
-                      ? "POST"
-                      : selectedNode.automation.method ?? "POST",
+                  method: selectedNode.automation.method ?? "POST",
                   headers: selectedNode.automation.headers,
                   payload_template: selectedNode.automation.payloadTemplate,
                 }

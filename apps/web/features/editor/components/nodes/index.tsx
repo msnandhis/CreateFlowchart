@@ -1,3 +1,3 @@
 "use client";
 
-export { nodeRenderRegistry, nodeTypes } from "./registry";
+export { DiagramNodeRenderer, nodeTypes } from "./registry";
