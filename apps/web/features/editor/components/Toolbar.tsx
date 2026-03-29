@@ -3,6 +3,8 @@
 import { useEditorStore, useIsDirty } from "../stores/editorStore";
 import { Button } from "@/shared/ui/Button";
 import styles from "../styles/toolbar.module.css";
+import { useLayout } from "../hooks/use-layout";
+
 
 export function Toolbar() {
   const title = useEditorStore((s) => s.title);
@@ -12,6 +14,8 @@ export function Toolbar() {
   const canUndo = useEditorStore((s) => s.canUndo);
   const canRedo = useEditorStore((s) => s.canRedo);
   const isDirty = useIsDirty();
+
+  const { performLayout } = useLayout();
 
   return (
     <div className={styles.toolbar}>
@@ -39,13 +43,14 @@ export function Toolbar() {
 
       {/* Actions */}
       <div className={styles.group}>
-        <Button variant="ghost" size="sm" title="Auto Layout">
+        <Button variant="ghost" size="sm" title="Auto Layout" onClick={performLayout}>
           <LayoutIcon />
         </Button>
         <Button variant="ghost" size="sm" title="AI Generate (/)">
           <SparklesIcon />
         </Button>
       </div>
+
 
       <div className={styles.spacer} />
 

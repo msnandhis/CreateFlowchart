@@ -1,4 +1,5 @@
-import redis from "./redis";
+import { redis } from "./redis";
+
 
 interface RateLimitResult {
   allowed: boolean;

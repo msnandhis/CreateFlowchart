@@ -14,10 +14,14 @@ import "@xyflow/react/dist/style.css";
 import { useEditorStore, useNodes, useEdges } from "../stores/editorStore";
 import { nodeTypes } from "./nodes";
 import styles from "../styles/canvas.module.css";
+import type { WebsocketProvider } from "y-websocket";
+import { PresenceLayer } from "./PresenceLayer";
+import { useMemo } from "react";
 
-export function Canvas() {
+export function Canvas({ provider }: { provider: WebsocketProvider | null }) {
   const nodes = useNodes();
   const edges = useEdges();
+  
   const onNodesChange = useEditorStore((s) => s.onNodesChange);
   const onEdgesChange = useEditorStore((s) => s.onEdgesChange);
   const onConnect = useEditorStore((s) => s.onConnect);
@@ -32,8 +36,27 @@ export function Canvas() {
     setSelectedEdge(null);
   };
 
+  /**
+   * Track local mouse movement and broadcast to other users via Yjs awareness.
+   */
+  const handlePointerMove = (event: React.PointerEvent) => {
+    if (!provider) return;
+    
+    // We update the awareness state with the local cursor position
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+
+    provider.awareness.setLocalStateField("cursor", {
+      x,
+      y,
+      name: "User", // TODO: Get from session
+      color: "#3b82f6", // TODO: Assign random per user
+    });
+  };
+
   return (
-    <div className={styles.canvas}>
+    <div className={styles.canvas} onPointerMove={handlePointerMove}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -63,7 +86,9 @@ export function Canvas() {
           zoomable
           style={{ width: 160, height: 100 }}
         />
+        <PresenceLayer provider={provider} />
       </ReactFlow>
     </div>
   );
 }
+

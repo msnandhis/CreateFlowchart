@@ -47,8 +47,8 @@ export class OpenRouterProvier implements AIProvider {
       throw new AIError(this.name, `Failed to generate: ${response.statusText}`, await response.text());
     }
 
-    const data = await response.json();
-    const content = data.choices[0]?.message?.content;
+    const data = (await response.json()) as any;
+    const content = data.choices?.[0]?.message?.content;
 
     try {
       return JSON.parse(content);
@@ -87,8 +87,8 @@ export class OpenAIProvider implements AIProvider {
       throw new AIError(this.name, `Failed: ${response.statusText}`, await response.text());
     }
 
-    const data = await response.json();
-    return JSON.parse(data.choices[0]?.message?.content);
+    const data = (await response.json()) as any;
+    return JSON.parse(data.choices?.[0]?.message?.content);
   }
 }
 
@@ -120,8 +120,8 @@ export class AnthropicProvider implements AIProvider {
       throw new AIError(this.name, `Failed: ${response.statusText}`, await response.text());
     }
 
-    const data = await response.json();
-    const content = data.content[0].text;
+    const data = (await response.json()) as any;
+    const content = data.content?.[0]?.text;
     return JSON.parse(content);
   }
 }
@@ -153,8 +153,8 @@ export class XAIProvider implements AIProvider {
       throw new AIError(this.name, `Failed: ${response.statusText}`, await response.text());
     }
 
-    const data = await response.json();
-    return JSON.parse(data.choices[0]?.message?.content);
+    const data = (await response.json()) as any;
+    return JSON.parse(data.choices?.[0]?.message?.content);
   }
 }
 

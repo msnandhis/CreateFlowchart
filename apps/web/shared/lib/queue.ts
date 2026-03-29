@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
-import redis from "./redis";
+import { redis } from "./redis";
+
 
 // ─── Queue Definitions ─────────────────────────────────────────────
 // All queues share the same Redis connection
