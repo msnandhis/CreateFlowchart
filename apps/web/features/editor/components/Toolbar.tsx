@@ -4,15 +4,21 @@ import { useEditorStore, useIsDirty } from "../stores/editorStore";
 import { Button } from "@/shared/ui/Button";
 import styles from "../styles/toolbar.module.css";
 import { useLayout } from "../hooks/use-layout";
+import { ConnectionStatus } from "./ConnectionStatus";
 
 export type EditorSurfaceMode = "canvas" | "split" | "code";
 
 interface ToolbarProps {
   surfaceMode: EditorSurfaceMode;
   onSurfaceModeChange: (mode: EditorSurfaceMode) => void;
+  connectionStatus?: "disconnected" | "connecting" | "connected";
 }
 
-export function Toolbar({ surfaceMode, onSurfaceModeChange }: ToolbarProps) {
+export function Toolbar({
+  surfaceMode,
+  onSurfaceModeChange,
+  connectionStatus = "disconnected",
+}: ToolbarProps) {
   const title = useEditorStore((s) => s.title);
   const setTitle = useEditorStore((s) => s.setTitle);
   const undo = useEditorStore((s) => s.undo);
@@ -81,6 +87,8 @@ export function Toolbar({ surfaceMode, onSurfaceModeChange }: ToolbarProps) {
       <span className={`${styles.saveIndicator} ${isDirty ? styles.dirty : ""}`}>
         {isDirty ? "Unsaved changes" : "Saved"}
       </span>
+
+      <ConnectionStatus status={connectionStatus} />
 
       <div className={styles.group}>
         <Button variant="ghost" size="sm" title="Export">

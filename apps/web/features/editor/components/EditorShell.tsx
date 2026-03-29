@@ -12,6 +12,7 @@ import { useYjs } from "../hooks/use-yjs";
 import { useAutosave } from "../hooks/use-autosave";
 import { useShortcuts } from "../hooks/use-shortcuts";
 import { useAutoLayout } from "../hooks/use-auto-layout";
+import styles from "../styles/editor-shell.module.css";
 
 interface EditorShellProps {
   initialData?: any;
@@ -34,7 +35,9 @@ export function EditorShell({
     "split",
   );
 
-  const { provider, updateLocalCursor } = useYjs(initialData?.id);
+  const { provider, updateLocalCursor, connectionStatus } = useYjs(
+    initialData?.id,
+  );
 
   useAutosave();
   useShortcuts();
@@ -46,23 +49,15 @@ export function EditorShell({
   }, [initialData, setInitialData]);
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100vh",
-        width: "100vw",
-        overflow: "hidden",
-        background: "#0a0a0a",
-      }}
-    >
+    <div className={styles.shell}>
       <Toolbar
         surfaceMode={surfaceMode}
         onSurfaceModeChange={setSurfaceMode}
+        connectionStatus={connectionStatus}
       />
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+      <div className={styles.workspace}>
         {surfaceMode !== "code" ? (
-          <main style={{ flex: 1, position: "relative" }}>
+          <main className={styles.canvasPane}>
             <Canvas provider={provider} updateLocalCursor={updateLocalCursor} />
           </main>
         ) : null}

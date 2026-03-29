@@ -1,7 +1,11 @@
 import type { WebSocket } from "ws";
 import type { IncomingMessage } from "node:http";
 import * as Y from "yjs";
-import { getPersistence, type RoomPersistence } from "../persistence";
+import {
+  getPersistence,
+  type PersistedRoomState,
+  type RoomPersistence,
+} from "../persistence";
 
 interface SyncConnection {
   ws: WebSocket;
@@ -53,7 +57,7 @@ export function broadcastToRoom(
 
 export function handleSyncConnection(
   ws: WebSocket,
-  req: IncomingMessage,
+  _req: IncomingMessage,
   roomName: string,
 ): { success: boolean; error?: string; userId?: string } {
   const doc = new Y.Doc();
@@ -81,6 +85,7 @@ export function handleSyncConnection(
       Y.applyUpdate(doc, update, "remote");
 
       broadcastToRoom(roomName, ws, update);
+      void persistRoom(roomName, persistence);
     } catch (err) {
       console.error(
         `[Sync] Error processing message in room ${roomName}:`,
@@ -90,6 +95,7 @@ export function handleSyncConnection(
   });
 
   ws.on("close", () => {
+    void persistRoom(roomName, persistence);
     removeConnection(roomName, ws);
     doc.destroy();
     console.log(
@@ -103,7 +109,7 @@ export function handleSyncConnection(
     doc.destroy();
   });
 
-  loadPersistedDoc(doc, roomName, persistence);
+  void loadPersistedDoc(doc, roomName, persistence);
 
   console.log(
     `[Sync] New connection for room: ${roomName}, user: guest`,
@@ -121,8 +127,9 @@ async function loadPersistedDoc(
   try {
     const persisted = await persistence.load(roomName);
     if (persisted) {
-      const update = new Uint8Array(persisted);
+      const update = new Uint8Array(persisted.yjsSnapshot);
       Y.applyUpdate(doc, update, "persisted");
+      restoreCanonicalDocument(doc, persisted);
       console.log(`[Sync] Loaded persisted state for room: ${roomName}`);
     }
   } catch (err) {
@@ -144,11 +151,34 @@ export async function persistRoom(
 
   const doc = room[0].doc;
   const state = Y.encodeStateAsUpdate(doc);
+  const documentSnapshot = extractCanonicalDocument(doc);
 
   try {
-    await persistence.store(roomName, Buffer.from(state));
+    await persistence.store(roomName, {
+      yjsSnapshot: Buffer.from(state),
+      documentSnapshot,
+    });
     console.log(`[Sync] Persisted state for room: ${roomName}`);
   } catch (err) {
     console.error(`[Sync] Failed to persist room ${roomName}:`, err);
+  }
+}
+
+function extractCanonicalDocument(doc: Y.Doc): string | null {
+  const diagramMap = doc.getMap<string>("diagram");
+  return diagramMap.get("document") ?? null;
+}
+
+function restoreCanonicalDocument(
+  doc: Y.Doc,
+  persisted: PersistedRoomState,
+): void {
+  if (!persisted.documentSnapshot) {
+    return;
+  }
+
+  const diagramMap = doc.getMap<string>("diagram");
+  if (!diagramMap.get("document")) {
+    diagramMap.set("document", persisted.documentSnapshot);
   }
 }

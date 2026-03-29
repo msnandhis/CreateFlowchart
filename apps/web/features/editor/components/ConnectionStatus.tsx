@@ -16,19 +16,19 @@ export function ConnectionStatus({
   const getStatusInfo = () => {
     switch (status) {
       case "connected":
-        return { icon: "🟢", label: "Connected" };
+        return { label: "Connected" };
       case "connecting":
-        return { icon: "🟡", label: "Connecting..." };
+        return { label: "Connecting..." };
       case "disconnected":
-        return { icon: "🔴", label: "Disconnected" };
+        return { label: "Disconnected" };
     }
   };
 
-  const { icon, label } = getStatusInfo();
+  const { label } = getStatusInfo();
 
   return (
     <div className={`${styles.connectionStatus} ${styles[status]}`}>
-      <span className={styles.statusIcon}>{icon}</span>
+      <span className={styles.statusIcon} aria-hidden="true" />
       {showLabel && <span className={styles.statusLabel}>{label}</span>}
     </div>
   );

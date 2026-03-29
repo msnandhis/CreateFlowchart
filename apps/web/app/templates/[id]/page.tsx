@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Button } from "@/shared/ui/Button";
 import { DocumentPreview } from "@/features/diagram/components/DocumentPreview";
 import { templateService } from "@/features/templates/services/template-service";
+import styles from "./template-detail.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -19,70 +20,35 @@ export default async function TemplateDetailPage({
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-bg)",
-        color: "var(--color-text-primary)",
-      }}
-    >
-      <main
-        style={{
-          maxWidth: 1240,
-          margin: "0 auto",
-          padding: "48px 32px 72px",
-          display: "grid",
-          gap: 24,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            gap: 16,
-            flexWrap: "wrap",
-          }}
-        >
-          <div style={{ display: "grid", gap: 10 }}>
-            <Link href="/templates" style={{ color: "var(--color-text-muted)" }}>
+    <div className={styles.page}>
+      <main className={styles.main}>
+        <div className={styles.hero}>
+          <div className={styles.heroContent}>
+            <Link href="/templates" className={styles.backLink}>
               Back to templates
             </Link>
-            <div style={{ display: "grid", gap: 6 }}>
-              <h1 style={{ margin: 0, fontSize: "2rem" }}>{template.title}</h1>
+            <div className={styles.titleBlock}>
+              <h1 className={styles.title}>{template.title}</h1>
               {template.description ? (
-                <p
-                  style={{
-                    margin: 0,
-                    maxWidth: 720,
-                    color: "var(--color-text-secondary)",
-                  }}
-                >
-                  {template.description}
-                </p>
+                <p className={styles.description}>{template.description}</p>
               ) : null}
             </div>
-            <div
-              style={{
-                display: "flex",
-                gap: 14,
-                flexWrap: "wrap",
-                fontSize: 13,
-                color: "var(--color-text-muted)",
-              }}
-            >
-              <span>{template.family}</span>
-              <span>{template.nodeCount} nodes</span>
-              <span>{template.edgeCount} edges</span>
-              <span>{template.containerCount} groups</span>
-              <span>{template.usageCount} uses</span>
-              <span>{template.likeCount} likes</span>
-              <span>{template.category}</span>
-              <span>By {template.author.name}</span>
+            <div className={styles.meta}>
+              <span className={styles.pill}>{template.family}</span>
+              <span className={styles.pill}>{template.nodeCount} nodes</span>
+              <span className={styles.pill}>{template.edgeCount} edges</span>
+              <span className={styles.pill}>{template.containerCount} groups</span>
+              <span className={styles.pill}>{template.usageCount} uses</span>
+              <span className={styles.pill}>{template.likeCount} likes</span>
+              <span className={styles.pill}>{template.category}</span>
+              <span className={styles.pill}>By {template.author.name}</span>
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: 12 }}>
+          <div className={styles.actions}>
+            <Link href="/templates" className={styles.secondaryLink}>
+              Browse More
+            </Link>
             <Link href={`/editor?template=${template.id}`}>
               <Button variant="primary">Use Template</Button>
             </Link>
@@ -92,24 +58,9 @@ export default async function TemplateDetailPage({
         <DocumentPreview document={template.document} minHeight={520} />
 
         {template.tags.length ? (
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              flexWrap: "wrap",
-            }}
-          >
+          <div className={styles.tags}>
             {template.tags.map((tag) => (
-              <span
-                key={tag}
-                style={{
-                  padding: "6px 10px",
-                  borderRadius: 999,
-                  border: "1px solid var(--color-border)",
-                  color: "var(--color-text-secondary)",
-                  fontSize: 13,
-                }}
-              >
+              <span key={tag} className={styles.tag}>
                 {tag}
               </span>
             ))}

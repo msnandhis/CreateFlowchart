@@ -1,0 +1,23 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top left, rgba(14, 165, 233, 0.09), transparent 24%),
+    linear-gradient(180deg, #050816 0%, #0a0f1f 100%);
+}
+
+.workspace {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.canvasPane {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}

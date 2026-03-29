@@ -96,7 +96,11 @@
 }
 
 .statusIcon {
-  font-size: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+  box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent);
 }
 
 .statusLabel {

@@ -2,11 +2,17 @@ import Redis from "ioredis";
 
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 const SNAPSHOT_PREFIX = "flowchart:snapshot:";
+const DOCUMENT_PREFIX = "flowchart:document:";
 const SNAPSHOT_TTL = 60 * 60 * 24 * 7;
 
+export interface PersistedRoomState {
+  yjsSnapshot: Buffer;
+  documentSnapshot?: string | null;
+}
+
 export interface RoomPersistence {
-  store(roomName: string, data: Buffer): Promise<void>;
-  load(roomName: string): Promise<Buffer | null>;
+  store(roomName: string, state: PersistedRoomState): Promise<void>;
+  load(roomName: string): Promise<PersistedRoomState | null>;
   delete(roomName: string): Promise<void>;
 }
 
@@ -32,28 +38,53 @@ class RedisPersistence implements RoomPersistence {
     return `${SNAPSHOT_PREFIX}${roomName}`;
   }
 
-  async store(roomName: string, data: Buffer): Promise<void> {
-    await this.redis.set(
+  private documentKey(roomName: string): string {
+    return `${DOCUMENT_PREFIX}${roomName}`;
+  }
+
+  async store(roomName: string, state: PersistedRoomState): Promise<void> {
+    const multi = this.redis.multi();
+    multi.set(
       this.key(roomName),
-      data.toString("base64"),
+      state.yjsSnapshot.toString("base64"),
       "EX",
       SNAPSHOT_TTL,
     );
+
+    if (state.documentSnapshot) {
+      multi.set(
+        this.documentKey(roomName),
+        state.documentSnapshot,
+        "EX",
+        SNAPSHOT_TTL,
+      );
+    } else {
+      multi.del(this.documentKey(roomName));
+    }
+
+    await multi.exec();
   }
 
-  async load(roomName: string): Promise<Buffer | null> {
-    const stored = await this.redis.get(this.key(roomName));
+  async load(roomName: string): Promise<PersistedRoomState | null> {
+    const [stored, documentSnapshot] = await Promise.all([
+      this.redis.get(this.key(roomName)),
+      this.redis.get(this.documentKey(roomName)),
+    ]);
+
     if (!stored) return null;
 
     try {
-      return Buffer.from(stored, "base64");
+      return {
+        yjsSnapshot: Buffer.from(stored, "base64"),
+        documentSnapshot,
+      };
     } catch {
       return null;
     }
   }
 
   async delete(roomName: string): Promise<void> {
-    await this.redis.del(this.key(roomName));
+    await this.redis.del(this.key(roomName), this.documentKey(roomName));
   }
 
   close(): void {

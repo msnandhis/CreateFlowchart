@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { useEditorStore } from "../stores/editorStore";
@@ -36,6 +36,9 @@ interface UserPresence {
  * Handles nodes, edges, and presence (cursors).
  */
 export function useYjs(flowId: string | null) {
+  const [connectionStatus, setConnectionStatus] = useState<
+    "disconnected" | "connecting" | "connected"
+  >("disconnected");
   const document = useEditorStore((s) => s.document);
   const setDocument = useEditorStore((s) => s.setDocument);
   const ydocRef = useRef<Y.Doc | null>(null);
@@ -73,6 +76,7 @@ export function useYjs(flowId: string | null) {
       doc,
       { connect: true },
     );
+    setConnectionStatus("connecting");
 
     ydocRef.current = doc;
     providerRef.current = provider;
@@ -86,6 +90,12 @@ export function useYjs(flowId: string | null) {
       cursor: null,
       lastActive: Date.now(),
     } as UserPresence);
+
+    provider.on("status", ({ status }: { status: string }) => {
+      setConnectionStatus(
+        status === "connected" ? "connected" : "connecting",
+      );
+    });
 
     const handleYDocumentUpdate = () => {
       isLocalUpdateRef.current = true;
@@ -123,6 +133,7 @@ export function useYjs(flowId: string | null) {
       yDiagram.unobserve(handleYDocumentUpdate);
       provider.disconnect();
       doc.destroy();
+      setConnectionStatus("disconnected");
     };
   }, [flowId, setDocument]);
 
@@ -142,5 +153,5 @@ export function useYjs(flowId: string | null) {
     lastSerializedDocumentRef.current = serialized;
   }, [document]);
 
-  return { provider: providerRef.current, updateLocalCursor };
+  return { provider: providerRef.current, updateLocalCursor, connectionStatus };
 }
