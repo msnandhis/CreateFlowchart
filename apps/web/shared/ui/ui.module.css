@@ -95,6 +95,17 @@
 .input::placeholder { color: var(--color-text-muted); }
 .input:focus { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-light); }
 
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
 /* ─── Badge ─────────────────────────────────────────────────────── */
 .badge {
   display: inline-flex;

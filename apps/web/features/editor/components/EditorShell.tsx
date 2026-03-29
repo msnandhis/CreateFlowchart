@@ -69,6 +69,10 @@ export function EditorShell({
         checkpoints={checkpoints}
         onCreateCheckpoint={() => createCheckpoint()}
         onRestoreCheckpoint={restoreCheckpoint}
+        onOpenGenerate={onOpenGenerate}
+        onOpenAnalyze={onOpenAnalyze}
+        onOpenExport={onOpenExport}
+        onOpenImport={onOpenImport}
       />
       <div className={styles.workspace}>
         {surfaceMode !== "code" ? (

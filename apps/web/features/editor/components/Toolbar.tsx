@@ -33,6 +33,10 @@ interface ToolbarProps {
   checkpoints?: EditorCheckpoint[];
   onCreateCheckpoint?: () => void;
   onRestoreCheckpoint?: (id: string) => void;
+  onOpenGenerate?: () => void;
+  onOpenAnalyze?: () => void;
+  onOpenExport?: () => void;
+  onOpenImport?: () => void;
 }
 
 export function Toolbar({
@@ -44,6 +48,10 @@ export function Toolbar({
   checkpoints = [],
   onCreateCheckpoint,
   onRestoreCheckpoint,
+  onOpenGenerate,
+  onOpenAnalyze,
+  onOpenExport,
+  onOpenImport,
 }: ToolbarProps) {
   const title = useEditorStore((s) => s.title);
   const setTitle = useEditorStore((s) => s.setTitle);
@@ -57,18 +65,20 @@ export function Toolbar({
 
   return (
     <div className={styles.toolbar}>
-      {/* Title */}
-      <input
-        className={styles.titleInput}
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        aria-label="Flow title"
-      />
+      <div className={styles.titleBlock}>
+        <input
+          className={styles.titleInput}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          aria-label="Flow title"
+        />
+        <span className={`${styles.saveIndicator} ${isDirty ? styles.dirty : ""}`}>
+          {isDirty ? "Unsaved changes" : "Saved and synced"}
+        </span>
+      </div>
 
-      <div className={styles.separator} />
-
-      {/* Undo/Redo */}
-      <div className={styles.group}>
+      <div className={styles.toolbarFrame}>
+        <div className={styles.group}>
         <Button variant="ghost" size="sm" icon onClick={undo} disabled={!canUndo()} title="Undo (Ctrl+Z)">
           <UndoIcon />
         </Button>
@@ -77,39 +87,45 @@ export function Toolbar({
         </Button>
       </div>
 
-      <div className={styles.separator} />
+        <div className={styles.separator} />
 
-      {/* Actions */}
-      <div className={styles.group}>
+        <div className={styles.group}>
         <Button variant="ghost" size="sm" title="Auto Layout" onClick={performLayout}>
           <LayoutIcon />
         </Button>
-        <Button variant="ghost" size="sm" title="AI Generate (/)">
+        <Button variant="ghost" size="sm" title="AI Generate (/)" onClick={onOpenGenerate}>
           <SparklesIcon />
         </Button>
+        <Button variant="ghost" size="sm" title="Analyze" onClick={onOpenAnalyze}>
+          <InspectIcon />
+        </Button>
+        <Button variant="ghost" size="sm" title="Import" onClick={onOpenImport}>
+          <ImportIcon />
+        </Button>
+        </div>
+
+        <div className={styles.separator} />
+
+        <div className={styles.surfaceModes}>
+          {(["canvas", "split", "code"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              className={`${styles.surfaceButton} ${
+                surfaceMode === mode ? styles.surfaceButtonActive : ""
+              }`}
+              onClick={() => onSurfaceModeChange(mode)}
+            >
+              {mode === "canvas" ? "Canvas" : mode === "split" ? "Split" : "Code"}
+            </button>
+          ))}
+        </div>
       </div>
-
-      <div className={styles.separator} />
-
-      <div className={styles.surfaceModes}>
-        {(["canvas", "split", "code"] as const).map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            className={`${styles.surfaceButton} ${
-              surfaceMode === mode ? styles.surfaceButtonActive : ""
-            }`}
-            onClick={() => onSurfaceModeChange(mode)}
-          >
-            {mode === "canvas" ? "Canvas" : mode === "split" ? "Split" : "Code"}
-          </button>
-        ))}
-      </div>
-
 
       <div className={styles.spacer} />
 
-      <div className={styles.group}>
+      <div className={styles.statusCluster}>
+        <div className={styles.group}>
         <Button
           variant="ghost"
           size="sm"
@@ -135,25 +151,21 @@ export function Toolbar({
             </option>
           ))}
         </select>
+        </div>
+
+        {remoteUsers.size > 0 ? <PresenceAvatars users={remoteUsers} /> : null}
+
+        <ConnectionStatus status={connectionStatus} />
+
+        {connectionStatus === "disconnected" && onReconnect ? (
+          <Button variant="ghost" size="sm" onClick={onReconnect}>
+            Reconnect
+          </Button>
+        ) : null}
       </div>
 
-      {remoteUsers.size > 0 ? <PresenceAvatars users={remoteUsers} /> : null}
-
-      {/* Save Status */}
-      <span className={`${styles.saveIndicator} ${isDirty ? styles.dirty : ""}`}>
-        {isDirty ? "Unsaved changes" : "Saved"}
-      </span>
-
-      <ConnectionStatus status={connectionStatus} />
-
-      {connectionStatus === "disconnected" && onReconnect ? (
-        <Button variant="ghost" size="sm" onClick={onReconnect}>
-          Reconnect
-        </Button>
-      ) : null}
-
       <div className={styles.group}>
-        <Button variant="ghost" size="sm" title="Export">
+        <Button variant="ghost" size="sm" title="Export" onClick={onOpenExport}>
           <ExportIcon />
         </Button>
         <Button variant="secondary" size="sm" title="Share">
@@ -190,6 +202,20 @@ function SparklesIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" /><path d="M18 14l.7 2.1L21 17l-2.3.9L18 20l-.7-2.1L15 17l2.3-.9z" />
+    </svg>
+  );
+}
+function InspectIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" /><path d="m21 21-4.35-4.35" /><path d="M11 8v3l2 2" />
+    </svg>
+  );
+}
+function ImportIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" />
     </svg>
   );
 }

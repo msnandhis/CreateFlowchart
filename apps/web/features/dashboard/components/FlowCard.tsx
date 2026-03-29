@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { Badge } from "@/shared/ui/Badge";
-import styles from "../styles/dashboard.module.css";
 import type { DiagramDocument } from "@createflowchart/schema";
 import { DocumentCardPreview } from "@/features/diagram/components/DocumentCardPreview";
+import { DiagramEntityCard } from "@/features/diagram/components/DiagramEntityCard";
+import cardStyles from "@/features/diagram/components/diagram-entity-card.module.css";
 
 interface FlowCardProps {
   id: string;
@@ -48,62 +48,41 @@ export function FlowCard({
   });
 
   return (
-    <div className={styles.card}>
-      <Link href={`/editor/${id}`} className={styles.cardLink}>
-        <div className={styles.cardPreview}>
-          {document ? (
-            <DocumentCardPreview
-              document={document}
-              className={styles.cardPreviewCanvas}
-            />
-          ) : (
-            <svg
-              width="48"
-              height="48"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--color-text-muted)"
-              strokeWidth="1"
-            >
-              <rect x="3" y="3" width="7" height="7" rx="1" />
-              <rect x="14" y="3" width="7" height="7" rx="1" />
-              <rect x="3" y="14" width="7" height="7" rx="1" />
-              <rect x="14" y="14" width="7" height="7" rx="1" />
-              <path d="M10 6.5h4M6.5 10v4M17.5 10v4M10 17.5h4" />
-            </svg>
-          )}
-        </div>
-        <div className={styles.cardContent}>
-          <h3 className={styles.cardTitle}>{title}</h3>
-          <div className={styles.cardMetaBadges}>
-            {family ? <Badge variant="default">{family}</Badge> : null}
-            {containerCount > 0 ? (
-              <Badge variant="default">{containerCount} groups</Badge>
-            ) : null}
-          </div>
-          <div className={styles.cardMeta}>
-            <span>{formattedDate}</span>
-            <span>
-              {nodeCount} nodes / {edgeCount} edges
-            </span>
-            {isPublic && <Badge variant="success">Public</Badge>}
-          </div>
-        </div>
-      </Link>
-      <div className={styles.cardFooter}>
-        <Link href={`/editor/${id}`} className={styles.cardActionLink}>
-          Open
-        </Link>
-        {isPublic ? (
-          <Link href={`/view/${id}`} className={styles.cardActionLinkMuted}>
-            Preview
-          </Link>
-        ) : null}
-      </div>
-      <div className={styles.cardActions}>
-        {showLikeButton && (
+    <DiagramEntityCard
+      href={`/editor/${id}`}
+      preview={
+        document ? (
+          <DocumentCardPreview document={document} />
+        ) : (
+          <DocumentFallbackPreview />
+        )
+      }
+      title={title}
+      badges={
+        <>
+          {family ? <Badge variant="default">{family}</Badge> : null}
+          {containerCount > 0 ? (
+            <Badge variant="default">{containerCount} groups</Badge>
+          ) : null}
+          {isPublic ? <Badge variant="success">Public</Badge> : null}
+        </>
+      }
+      meta={
+        <>
+          <span className={cardStyles.statPill}>{nodeCount} nodes</span>
+          <span className={cardStyles.statPill}>{edgeCount} edges</span>
+          {likeCount > 0 ? (
+            <span className={cardStyles.statPill}>{likeCount} likes</span>
+          ) : null}
+        </>
+      }
+      metaAside={formattedDate}
+      secondaryAction={isPublic ? { href: `/view/${id}`, label: "Preview" } : undefined}
+      primaryAction={{ href: `/editor/${id}`, label: "Open", tone: "primary" }}
+      overlayActions={
+        showLikeButton ? (
           <button
-            className={`${styles.likeButton} ${userLiked ? styles.liked : ""}`}
+            className={`${cardStyles.likeButton} ${userLiked ? cardStyles.likeButtonActive : ""}`}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -118,23 +97,42 @@ export function FlowCard({
             <HeartIcon filled={userLiked} />
             <span>{likeCount}</span>
           </button>
-        )}
-        {!showLikeButton && (
+        ) : (
           <button
-            className={styles.iconButton}
+            className={cardStyles.iconButton}
             onClick={(e) => {
               e.preventDefault();
+              e.stopPropagation();
               if (confirm("Are you sure you want to delete this flow?")) {
                 onDelete?.(id);
               }
             }}
             title="Delete flow"
           >
-            🗑️
+            <TrashIcon />
           </button>
-        )}
-      </div>
-    </div>
+        )
+      }
+    />
+  );
+}
+
+function DocumentFallbackPreview() {
+  return (
+    <svg
+      width="72"
+      height="72"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="rgba(226,232,240,0.72)"
+      strokeWidth="1.2"
+    >
+      <rect x="3" y="3" width="7" height="7" rx="1.4" />
+      <rect x="14" y="3" width="7" height="7" rx="1.4" />
+      <rect x="3" y="14" width="7" height="7" rx="1.4" />
+      <rect x="14" y="14" width="7" height="7" rx="1.4" />
+      <path d="M10 6.5h4M6.5 10v4M17.5 10v4M10 17.5h4" />
+    </svg>
   );
 }
 
@@ -151,6 +149,26 @@ function HeartIcon({ filled }: { filled: boolean }) {
       strokeLinejoin="round"
     >
       <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M3 6h18" />
+      <path d="M8 6V4h8v2" />
+      <path d="M19 6l-1 14H6L5 6" />
+      <path d="M10 11v6M14 11v6" />
     </svg>
   );
 }

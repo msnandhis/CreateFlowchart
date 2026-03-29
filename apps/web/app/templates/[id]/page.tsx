@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button } from "@/shared/ui/Button";
+import { Badge } from "@/shared/ui/Badge";
 import { DocumentPreview } from "@/features/diagram/components/DocumentPreview";
 import { templateService } from "@/features/templates/services/template-service";
 import styles from "./template-detail.module.css";
@@ -34,13 +35,17 @@ export default async function TemplateDetailPage({
               ) : null}
             </div>
             <div className={styles.meta}>
-              <span className={styles.pill}>{template.family}</span>
+              <Badge variant="info">{template.family}</Badge>
               <span className={styles.pill}>{template.nodeCount} nodes</span>
               <span className={styles.pill}>{template.edgeCount} edges</span>
-              <span className={styles.pill}>{template.containerCount} groups</span>
+              {template.containerCount > 0 ? (
+                <span className={styles.pill}>{template.containerCount} groups</span>
+              ) : null}
               <span className={styles.pill}>{template.usageCount} uses</span>
               <span className={styles.pill}>{template.likeCount} likes</span>
-              <span className={styles.pill}>{template.category}</span>
+              {template.category ? (
+                <span className={styles.pill}>{template.category}</span>
+              ) : null}
               <span className={styles.pill}>By {template.author.name}</span>
             </div>
           </div>
@@ -52,10 +57,23 @@ export default async function TemplateDetailPage({
             <Link href={`/editor?template=${template.id}`}>
               <Button variant="primary">Use Template</Button>
             </Link>
+            <Link href={`/view/${template.id}`} className={styles.secondaryLink}>
+              Live Preview
+            </Link>
           </div>
         </div>
 
-        <DocumentPreview document={template.document} minHeight={520} />
+        <section className={styles.previewSection}>
+          <div className={styles.sectionHeader}>
+            <div>
+              <h2 className={styles.sectionTitle}>Template Preview</h2>
+              <p className={styles.sectionCopy}>
+                Review the complete diagram before remixing it into the editor.
+              </p>
+            </div>
+          </div>
+          <DocumentPreview document={template.document} minHeight={520} />
+        </section>
 
         {template.tags.length ? (
           <div className={styles.tags}>

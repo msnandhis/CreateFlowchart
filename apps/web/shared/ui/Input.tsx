@@ -9,9 +9,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, id, className, ...props }, ref) => {
     const inputId = id ?? label?.toLowerCase().replace(/\s+/g, "-");
     return (
-      <div>
+      <div className={styles.field}>
         {label && (
-          <label htmlFor={inputId} style={{ display: "block", fontSize: "var(--font-size-sm)", color: "var(--color-text-secondary)", marginBottom: "4px", fontWeight: "var(--font-weight-medium)" }}>
+          <label htmlFor={inputId} className={styles.fieldLabel}>
             {label}
           </label>
         )}

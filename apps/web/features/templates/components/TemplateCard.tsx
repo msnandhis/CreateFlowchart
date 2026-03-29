@@ -1,10 +1,10 @@
 "use client";
 
 import { Badge } from "@/shared/ui/Badge";
-import styles from "../styles/templates.module.css";
 import type { TemplateWithAuthor } from "../services/template-service";
-import Link from "next/link";
 import { DocumentCardPreview } from "@/features/diagram/components/DocumentCardPreview";
+import { DiagramEntityCard } from "@/features/diagram/components/DiagramEntityCard";
+import cardStyles from "@/features/diagram/components/diagram-entity-card.module.css";
 
 interface TemplateCardProps {
   template: TemplateWithAuthor;
@@ -24,53 +24,41 @@ export function TemplateCard({
   const nodeCount = template.nodeCount || template.document.nodes.length || 0;
 
   return (
-    <div className={styles.card}>
-      <Link href={`/templates/${template.id}`} className={styles.cardLink}>
-        <div className={styles.cardPreview}>
-          <DocumentCardPreview
-            document={template.document}
-            className={styles.cardPreviewCanvas}
-          />
-        </div>
-        <div className={styles.cardContent}>
-          <h3 className={styles.cardTitle}>{template.title}</h3>
-          {template.description && (
-            <p className={styles.cardDescription}>{template.description}</p>
-          )}
-          <div className={styles.cardMetaBadges}>
-            <Badge variant="default">{template.family}</Badge>
-            {template.containerCount > 0 ? (
-              <Badge variant="default">{template.containerCount} groups</Badge>
-            ) : null}
-          </div>
-          <div className={styles.cardMeta}>
-            <div className={styles.cardStats}>
-              <span>{nodeCount} nodes</span>
-              <span>{template.edgeCount} edges</span>
-              <span>{template.usageCount} uses</span>
-              <span>{template.likeCount} likes</span>
-            </div>
-            {template.category && (
-              <Badge variant="default">{template.category}</Badge>
-            )}
-          </div>
-        </div>
-      </Link>
-      <div className={styles.cardFooter}>
-        <Link href={`/templates/${template.id}`} className={styles.cardActionLink}>
-          Preview
-        </Link>
-        <Link
-          href={`/editor?template=${template.id}`}
-          className={styles.cardActionLinkPrimary}
-        >
-          Use Template
-        </Link>
-      </div>
-      {showActions && (
-        <div className={styles.cardActions}>
+    <DiagramEntityCard
+      href={`/templates/${template.id}`}
+      preview={<DocumentCardPreview document={template.document} />}
+      title={template.title}
+      description={template.description ?? undefined}
+      badges={
+        <>
+          <Badge variant="default">{template.family}</Badge>
+          {template.category ? (
+            <Badge variant="info">{template.category}</Badge>
+          ) : null}
+          {template.containerCount > 0 ? (
+            <Badge variant="default">{template.containerCount} groups</Badge>
+          ) : null}
+        </>
+      }
+      meta={
+        <>
+          <span className={cardStyles.statPill}>{nodeCount} nodes</span>
+          <span className={cardStyles.statPill}>{template.edgeCount} edges</span>
+          <span className={cardStyles.statPill}>{template.usageCount} uses</span>
+          <span className={cardStyles.statPill}>{template.likeCount} likes</span>
+        </>
+      }
+      metaAside={`By ${template.author.name}`}
+      secondaryAction={{ href: `/templates/${template.id}`, label: "Preview" }}
+      primaryAction={{
+        href: `/editor?template=${template.id}`,
+        label: "Use Template",
+        tone: "primary",
+      }}
+      overlayActions={
+        showActions ? (
           <button
-            className={`${styles.likeButton} ${userLiked ? styles.liked : ""}`}
+            className={`${cardStyles.likeButton} ${userLiked ? cardStyles.likeButtonActive : ""}`}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -85,9 +73,9 @@ export function TemplateCard({
             <HeartIcon filled={userLiked} />
             <span>{template.likeCount}</span>
           </button>
-        </div>
-      )}
-    </div>
+        ) : null
+      }
+    />
   );
 }
 
