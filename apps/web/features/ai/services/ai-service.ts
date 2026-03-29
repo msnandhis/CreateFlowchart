@@ -27,9 +27,9 @@ export interface AIImproveResult {
     before?: unknown;
     after?: unknown;
   }>;
-  newFlowGraph: unknown;
-  improvedDocument?: unknown;
-  improvedDsl?: string;
+  document: unknown;
+  dsl: string;
+  legacyFlowGraph?: unknown;
 }
 
 export interface AIExplainResult {

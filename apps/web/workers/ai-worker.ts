@@ -469,6 +469,9 @@ async function handleImprove(
     data: {
       originalDocument,
       originalDsl,
+      document: improvedDocument,
+      dsl: documentToFlowDsl(improvedDocument),
+      legacyFlowGraph: improvedFlow,
       improvedDocument,
       improvedDsl: documentToFlowDsl(improvedDocument),
       original: originalFlow,

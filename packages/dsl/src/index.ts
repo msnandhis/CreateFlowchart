@@ -72,6 +72,86 @@ export function mermaidToDocument(
   return astToDocument(parseMermaidFlowchart(source), base);
 }
 
+export function documentToMermaid(document: DiagramDocument): string {
+  const lines: string[] = ["flowchart TD"];
+  const renderedNodes = new Set<string>();
+  const rootContainerIds = document.containers
+    .filter((container) => !container.metadata.parentContainerId)
+    .map((container) => container.id);
+
+  const renderNode = (node: DiagramNode) => {
+    if (renderedNodes.has(node.id)) {
+      return;
+    }
+
+    const label = node.content.title.replace(/"/g, "'");
+
+    if (node.kind.includes("start") || node.kind.includes("end")) {
+      lines.push(`    ${node.id}(["${label}"])`);
+    } else if (node.kind.includes("gateway") || node.kind.includes("decision")) {
+      lines.push(`    ${node.id}{"${label}"}`);
+    } else if (node.kind.includes("automation") || node.kind.includes("service")) {
+      lines.push(`    ${node.id}[/\"${label}\"/]`);
+    } else if (node.shape === "document" || node.shape === "multi-document") {
+      lines.push(`    ${node.id}["${label}"]`);
+    } else {
+      lines.push(`    ${node.id}["${label}"]`);
+    }
+
+    renderedNodes.add(node.id);
+  };
+
+  const renderContainer = (containerId: string, depth: number) => {
+    const container = document.containers.find((entry) => entry.id === containerId);
+    if (!container) {
+      return;
+    }
+
+    const indent = "    ".repeat(depth + 1);
+    lines.push(`${indent}subgraph ${container.id}["${container.label.replace(/"/g, "'")}"]`);
+
+    for (const childContainerId of container.childContainerIds) {
+      renderContainer(childContainerId, depth + 1);
+    }
+
+    for (const childNodeId of container.childNodeIds) {
+      const node = document.nodes.find((entry) => entry.id === childNodeId);
+      if (node) {
+        renderNode(node);
+      }
+    }
+
+    lines.push(`${indent}end`);
+  };
+
+  for (const containerId of rootContainerIds) {
+    renderContainer(containerId, 0);
+  }
+
+  for (const node of document.nodes) {
+    renderNode(node);
+  }
+
+  for (const edge of document.edges) {
+    const label = edge.labels[0]?.text?.replace(/"/g, "'");
+    const connector = edge.kind.includes("message")
+      ? "-.->"
+      : edge.kind.includes("association")
+        ? "---"
+        : edge.kind.includes("conditional") || edge.labels.length > 0
+          ? "==>"
+          : "-->";
+
+    lines.push(
+      label
+        ? `    ${edge.sourceNodeId} ${connector}|\"${label}\"| ${edge.targetNodeId}`
+        : `    ${edge.sourceNodeId} ${connector} ${edge.targetNodeId}`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
 export function printFlowDsl(ast: DiagramDslAst): string {
   const lines: string[] = [
     `diagram "${escapeString(ast.title)}" family ${ast.family} kit ${ast.kit}`,
@@ -320,15 +400,69 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
   const directionMatch = firstLine.match(/(?:flowchart|graph)\s+([A-Z]{2})/i);
   const direction = directionMatch?.[1] ?? "TD";
   const nodes = new Map<string, DiagramNode>();
+  const containers = new Map<string, DiagramContainer>();
   const edges: DiagramEdge[] = [];
+  const containerStack: string[] = [];
+  const laneOffsets = new Map<string, number>();
+  const nodeToContainer = new Map<string, string>();
+  const childContainerAssignments = new Map<string, Set<string>>();
+
+  const ensureContainer = (containerId: string, label: string) => {
+    if (containers.has(containerId)) {
+      return containers.get(containerId)!;
+    }
+
+    const parentContainerId = containerStack.at(-1);
+    const type =
+      parentContainerId || /lane/i.test(label) ? ("lane" as const) : ("group" as const);
+    const laneOffset = parentContainerId
+      ? laneOffsets.get(parentContainerId) ?? 0
+      : containers.size * 220;
+    const container: DiagramContainer = {
+      id: containerId,
+      family: "flowchart",
+      type,
+      label,
+      position: {
+        x: parentContainerId ? 80 : 40,
+        y: parentContainerId ? 40 + laneOffset : 40 + containers.size * 40,
+      },
+      size: {
+        width: parentContainerId ? 920 : 1000,
+        height: parentContainerId ? 180 : 240,
+      },
+      childNodeIds: [],
+      childContainerIds: [],
+      style: { tokens: {} },
+      metadata: parentContainerId ? { parentContainerId } : {},
+    };
+
+    containers.set(containerId, container);
+
+    if (parentContainerId) {
+      const siblings = childContainerAssignments.get(parentContainerId) ?? new Set<string>();
+      siblings.add(containerId);
+      childContainerAssignments.set(parentContainerId, siblings);
+      laneOffsets.set(parentContainerId, laneOffset + 180);
+    }
+
+    return container;
+  };
 
   const ensureNode = (nodeId: string, token?: string) => {
     if (nodes.has(nodeId)) {
-      return nodes.get(nodeId)!;
+      const existing = nodes.get(nodeId)!;
+      const activeContainerId = containerStack.at(-1);
+      if (activeContainerId && !nodeToContainer.has(nodeId)) {
+        nodeToContainer.set(nodeId, activeContainerId);
+      }
+      return existing;
     }
 
     const parsed = parseMermaidNodeToken(token ?? nodeId);
     const index = nodes.size;
+    const activeContainerId = containerStack.at(-1);
+    const container = activeContainerId ? containers.get(activeContainerId) : undefined;
     const x = direction === "LR" || direction === "RL" ? index * 260 : 120;
     const y = direction === "LR" || direction === "RL" ? 120 : index * 140;
 
@@ -337,7 +471,12 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
       family: "flowchart",
       kind: parsed.kind,
       shape: parsed.shape,
-      position: { x, y },
+      position: {
+        x: container ? container.position.x + 120 + ((container.childNodeIds.length % 3) * 220) : x,
+        y: container
+          ? container.position.y + 72 + Math.floor(container.childNodeIds.length / 3) * 120
+          : y,
+      },
       size: parsed.size,
       ports: [],
       content: {
@@ -354,16 +493,37 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
     };
 
     nodes.set(nodeId, node);
+    if (activeContainerId && container) {
+      container.childNodeIds.push(nodeId);
+      nodeToContainer.set(nodeId, activeContainerId);
+    }
     return node;
   };
 
   for (const line of lines.slice(1)) {
+    if (/^subgraph\s+/i.test(line)) {
+      const subgraphMatch = line.match(/^subgraph\s+([A-Za-z0-9_-]+)?(?:\[(.+)\]|\"(.+)\"|(.+))?$/i);
+      const rawId = subgraphMatch?.[1];
+      const rawLabel = subgraphMatch?.[2] ?? subgraphMatch?.[3] ?? subgraphMatch?.[4];
+      const label = rawLabel?.trim() || rawId || `Group ${containers.size + 1}`;
+      const containerId =
+        rawId && rawId.length > 0 ? rawId : `subgraph_${containers.size + 1}`;
+      ensureContainer(containerId, label.replace(/^"|"$/g, ""));
+      containerStack.push(containerId);
+      continue;
+    }
+
+    if (/^end$/i.test(line)) {
+      containerStack.pop();
+      continue;
+    }
+
     const edgeMatch = line.match(
-      /^([A-Za-z0-9_-]+(?:[\[\(\{\/].*?)?)\s*-->\s*(?:\|([^|]+)\|\s*)?([A-Za-z0-9_-]+(?:[\[\(\{\/].*)?)$/,
+      /^(.+?)\s*(-->|-.->|==>|---)\s*(?:\|([^|]+)\|\s*)?(.+)$/,
     );
 
     if (edgeMatch) {
-      const [, rawSource, edgeLabel, rawTarget] = edgeMatch;
+      const [, rawSource, connector, edgeLabel, rawTarget] = edgeMatch;
       const sourceToken = rawSource.trim();
       const targetToken = rawTarget.trim();
       const sourceId = extractNodeId(sourceToken);
@@ -375,7 +535,14 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
       edges.push({
         id: `edge_${sourceId}_${targetId}_${edges.length + 1}`,
         family: "flowchart",
-        kind: edgeLabel ? "conditional-flow" : "flow",
+        kind:
+          connector === "-.->"
+            ? "message-flow"
+            : connector === "---"
+              ? "association-flow"
+              : edgeLabel || connector === "==>"
+                ? "conditional-flow"
+                : "flow",
         sourceNodeId: sourceId,
         targetNodeId: targetId,
         routing: "orthogonal",
@@ -395,13 +562,20 @@ export function parseMermaidFlowchart(source: string): DiagramDslAst {
     ensureNode(nodeId, line);
   }
 
+  for (const [containerId, childContainerIds] of childContainerAssignments.entries()) {
+    const container = containers.get(containerId);
+    if (container) {
+      container.childContainerIds = Array.from(childContainerIds);
+    }
+  }
+
   return {
     family: "flowchart",
     kit: "core-flowchart",
     title: "Imported Mermaid Diagram",
     nodes: Array.from(nodes.values()),
     edges,
-    containers: [],
+    containers: Array.from(containers.values()),
   };
 }
 

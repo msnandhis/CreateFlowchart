@@ -15,6 +15,7 @@ import {
   addLegacyNode,
   addDocumentContainerEntity,
   assignNodeToContainer,
+  detectContainerForNode,
   applyReactFlowProjection,
   createEditorProjection,
   deleteSelectedEntities,
@@ -63,6 +64,7 @@ interface EditorState {
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: (connection: Connection) => void;
+  onNodeDragStop: (event: unknown, node: Node) => void;
   addNode: (node: FlowNode) => void;
   addContainer: (container: DiagramContainer) => void;
   deleteSelected: () => void;
@@ -227,6 +229,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return syncFromProjection(
         applyReactFlowProjection(s.engineState, s.rfNodes, updated),
+      );
+    });
+  },
+
+  onNodeDragStop: (_event, node) => {
+    set((s) => {
+      const containerId = detectContainerForNode(s.document, node.id, node.position);
+      return syncFromProjection(
+        assignNodeToContainer(s.engineState, node.id, containerId),
       );
     });
   },

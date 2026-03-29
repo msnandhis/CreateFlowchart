@@ -5,14 +5,20 @@ import {
   users,
 } from "@createflowchart/db/src/schema";
 import { eq, desc, and, sql, like, or } from "drizzle-orm";
-import type { Template, NewTemplate } from "@createflowchart/db/src/schema";
+import type { Template } from "@createflowchart/db/src/schema";
 import type { FlowGraph } from "@createflowchart/core";
+import type { DiagramDocument } from "@createflowchart/schema";
+import {
+  createPersistedFlowEnvelope,
+  normalizePersistedFlow,
+} from "@/features/editor/lib/persisted-flow";
 
 export interface CreateTemplateInput {
   userId: string;
   title: string;
   description?: string;
-  data: FlowGraph;
+  data?: FlowGraph;
+  document?: DiagramDocument;
   category?: string;
   tags?: string[];
   isPublic?: boolean;
@@ -23,12 +29,15 @@ export interface TemplateWithAuthor {
   title: string;
   description: string | null;
   data: FlowGraph;
+  document: DiagramDocument;
+  formatVersion: "flowgraph-v1" | "document-v2" | "flowgraph-v1+document-v2";
   category: string;
   tags: string[];
   usageCount: number;
   likeCount: number;
   isFeatured: boolean;
   isPublic: boolean;
+  nodeCount: number;
   createdAt: Date;
   updatedAt: Date;
   author: {
@@ -48,15 +57,40 @@ export interface SearchTemplatesInput {
   sortBy?: "recent" | "popular" | "likes";
 }
 
+interface TemplateRecord {
+  id: string;
+  title: string;
+  description: string | null;
+  data: unknown;
+  category: string | null;
+  tags: string[] | null;
+  usageCount: number;
+  likeCount: number;
+  isFeatured: boolean;
+  isPublic: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  authorId?: string;
+  authorName?: string | null;
+  authorImage?: string | null;
+}
+
 class TemplateService {
   async create(input: CreateTemplateInput): Promise<Template> {
+    const normalized = createPersistedFlowEnvelope({
+      data: input.data,
+      document: input.document,
+      title: input.title,
+      authorId: input.userId,
+    });
+
     const [template] = await db
       .insert(templates)
       .values({
         userId: input.userId,
         title: input.title,
         description: input.description,
-        data: input.data as any,
+        data: normalized as any,
         category: input.category || "general",
         tags: input.tags || [],
         isPublic: input.isPublic ?? true,
@@ -111,22 +145,11 @@ class TemplateService {
     }
 
     return {
-      id: template.id,
-      title: template.title,
-      description: template.description,
-      data: template.data as unknown as FlowGraph,
-      category: template.category || "general",
-      tags: template.tags || [],
-      usageCount: template.usageCount,
-      likeCount: template.likeCount,
-      isFeatured: template.isFeatured,
-      isPublic: template.isPublic,
-      createdAt: template.createdAt,
-      updatedAt: template.updatedAt,
+      ...this.normalizeTemplateRecord(template),
       author: {
         id: template.authorId,
-        name: template.authorName,
-        image: template.authorImage,
+        name: template.authorName ?? "Unknown",
+        image: template.authorImage ?? null,
       },
       userLiked,
     };
@@ -202,22 +225,11 @@ class TemplateService {
       .where(and(...conditions));
 
     const templatesList: TemplateWithAuthor[] = results.map((t) => ({
-      id: t.id,
-      title: t.title,
-      description: t.description,
-      data: t.data as unknown as FlowGraph,
-      category: t.category || "general",
-      tags: t.tags || [],
-      usageCount: t.usageCount,
-      likeCount: t.likeCount,
-      isFeatured: t.isFeatured,
-      isPublic: t.isPublic,
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt,
+      ...this.normalizeTemplateRecord(t),
       author: {
         id: t.authorId,
-        name: t.authorName,
-        image: t.authorImage,
+        name: t.authorName ?? "Unknown",
+        image: t.authorImage ?? null,
       },
     }));
 
@@ -253,27 +265,22 @@ class TemplateService {
       .limit(limit);
 
     return results.map((t) => ({
-      id: t.id,
-      title: t.title,
-      description: t.description,
-      data: t.data as unknown as FlowGraph,
-      category: t.category || "general",
-      tags: t.tags || [],
-      usageCount: t.usageCount,
-      likeCount: t.likeCount,
-      isFeatured: t.isFeatured,
-      isPublic: t.isPublic,
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt,
+      ...this.normalizeTemplateRecord(t),
       author: {
         id: t.authorId,
-        name: t.authorName,
-        image: t.authorImage,
+        name: t.authorName ?? "Unknown",
+        image: t.authorImage ?? null,
       },
     }));
   }
 
-  async getByUser(userId: string, limit: number = 20): Promise<Template[]> {
+  async getByUser(userId: string, limit: number = 20): Promise<
+    Array<
+      Omit<TemplateWithAuthor, "author"> & {
+        author: { id: string; name: string; image: string | null };
+      }
+    >
+  > {
     const results = await db
       .select()
       .from(templates)
@@ -281,7 +288,17 @@ class TemplateService {
       .orderBy(desc(templates.createdAt))
       .limit(limit);
 
-    return results as Template[];
+    return results.map((template) => ({
+      ...this.normalizeTemplateRecord({
+        ...template,
+        data: template.data,
+      }),
+      author: {
+        id: userId,
+        name: "You",
+        image: null,
+      },
+    }));
   }
 
   async update(
@@ -359,6 +376,33 @@ class TemplateService {
       .groupBy(templates.category);
 
     return results.map((r) => r.category).filter((c): c is string => !!c);
+  }
+
+  private normalizeTemplateRecord(record: TemplateRecord): Omit<TemplateWithAuthor, "author" | "userLiked"> {
+    const normalized = normalizePersistedFlow({
+      data: typeof record.data === "string" ? JSON.parse(record.data) : record.data,
+      id: record.id,
+      title: record.title,
+      authorId: record.authorId,
+    });
+
+    return {
+      id: record.id,
+      title: record.title,
+      description: record.description,
+      data: normalized.legacy,
+      document: normalized.document,
+      formatVersion: normalized.formatVersion,
+      category: record.category || "general",
+      tags: record.tags || [],
+      usageCount: record.usageCount,
+      likeCount: record.likeCount,
+      isFeatured: record.isFeatured,
+      isPublic: record.isPublic,
+      nodeCount: normalized.document.nodes.length,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    };
   }
 }
 

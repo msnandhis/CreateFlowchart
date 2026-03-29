@@ -445,6 +445,40 @@ export function assignNodeToContainer(
   return projectEngineState(nextState);
 }
 
+export function detectContainerForNode(
+  document: DiagramDocument,
+  nodeId: string,
+  position?: { x: number; y: number },
+): string | null {
+  const node = document.nodes.find((candidate) => candidate.id === nodeId);
+  if (!node) return null;
+
+  const nodeLeft = position?.x ?? node.position.x;
+  const nodeTop = position?.y ?? node.position.y;
+  const nodeRight = nodeLeft + node.size.width;
+  const nodeBottom = nodeTop + node.size.height;
+
+  const matchingContainers = document.containers.filter((container) => {
+    const labelOffset = container.type === "pool" || container.type === "lane" ? 42 : 0;
+    const left = container.position.x + labelOffset;
+    const top = container.position.y;
+    const right = container.position.x + container.size.width;
+    const bottom = container.position.y + container.size.height;
+
+    return nodeLeft >= left && nodeRight <= right && nodeTop >= top && nodeBottom <= bottom;
+  });
+
+  if (matchingContainers.length === 0) {
+    return null;
+  }
+
+  return matchingContainers
+    .sort(
+      (a, b) =>
+        a.size.width * a.size.height - b.size.width * b.size.height,
+    )[0]?.id ?? null;
+}
+
 const DIAGRAM_FAMILIES: DiagramFamily[] = [
   "flowchart",
   "bpmn",

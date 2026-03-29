@@ -80,6 +80,33 @@
   border-top: 1px solid var(--color-border);
 }
 
+.diffBox {
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.55);
+  padding: 12px;
+}
+
+.diffGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.highlights {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.highlightItem {
+  color: var(--color-text-primary);
+  font-size: var(--font-size-xs);
+}
+
 .hint {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);

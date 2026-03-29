@@ -40,12 +40,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { title, description, data, category, tags, isPublic } =
+  const { title, description, data, document, category, tags, isPublic } =
     await req.json();
 
-  if (!title || !data) {
+  if (!title || (!data && !document)) {
     return NextResponse.json(
-      { error: "Title and data are required" },
+      { error: "Title and diagram payload are required" },
       { status: 400 },
     );
   }
@@ -55,6 +55,7 @@ export async function POST(req: Request) {
     title,
     description,
     data,
+    document,
     category,
     tags,
     isPublic,

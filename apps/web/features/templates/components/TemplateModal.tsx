@@ -7,6 +7,7 @@ import { Input } from "@/shared/ui/Input";
 import { Badge } from "@/shared/ui/Badge";
 import styles from "../styles/templates.module.css";
 import type { FlowGraph } from "@createflowchart/core";
+import type { DiagramDocument } from "@createflowchart/schema";
 
 interface TemplateModalProps {
   open: boolean;
@@ -16,9 +17,11 @@ interface TemplateModalProps {
     description?: string;
     category?: string;
     tags?: string[];
-    data: FlowGraph;
+    data?: FlowGraph;
+    document?: DiagramDocument;
   }) => Promise<void>;
   currentFlowData?: FlowGraph;
+  currentDocument?: DiagramDocument;
   mode?: "save" | "browse";
 }
 
@@ -27,6 +30,7 @@ export function TemplateModal({
   onClose,
   onSaveAsTemplate,
   currentFlowData,
+  currentDocument,
   mode = "browse",
 }: TemplateModalProps) {
   const [title, setTitle] = useState("");
@@ -36,7 +40,7 @@ export function TemplateModal({
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    if (!title.trim() || !currentFlowData || !onSaveAsTemplate) return;
+    if (!title.trim() || (!currentFlowData && !currentDocument) || !onSaveAsTemplate) return;
 
     setSaving(true);
     try {
@@ -49,6 +53,7 @@ export function TemplateModal({
           .map((t) => t.trim())
           .filter(Boolean),
         data: currentFlowData,
+        document: currentDocument,
       });
       onClose();
       setTitle("");

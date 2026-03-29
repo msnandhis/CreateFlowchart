@@ -11,8 +11,11 @@ interface FlowWithAuthor {
   id: string;
   title: string;
   data: unknown;
+  document: unknown;
+  formatVersion: string;
   isPublic: boolean;
   likeCount: number;
+  nodeCount: number;
   createdAt: Date;
   updatedAt: Date;
   author: {
@@ -76,8 +79,11 @@ export async function GET(req: Request) {
       id: f.id,
       title: f.title,
       data: normalized.legacy,
+      document: normalized.document,
+      formatVersion: normalized.formatVersion,
       isPublic: f.isPublic,
       likeCount: f.likeCount,
+      nodeCount: normalized.document.nodes.length,
       createdAt: f.createdAt,
       updatedAt: f.updatedAt,
       author: {

@@ -52,8 +52,8 @@ export function ImproveDiff({ onClose }: ImproveDiffProps) {
   };
 
   const handleApply = () => {
-    if (result?.improvedDocument) {
-      setDocument(result.improvedDocument as typeof document);
+    if (result?.document) {
+      setDocument(result.document as typeof document);
       onClose();
     }
   };
@@ -144,8 +144,8 @@ export function ImproveDiff({ onClose }: ImproveDiffProps) {
             <div className={styles.diffPreview}>
               <h4>Preview</h4>
               <p className={styles.nodeCount}>
-                {Array.isArray((result.improvedDocument as { nodes?: unknown[] } | undefined)?.nodes)
-                  ? (result.improvedDocument as { nodes: unknown[] }).nodes.length
+                {Array.isArray((result.document as { nodes?: unknown[] } | undefined)?.nodes)
+                  ? (result.document as { nodes: unknown[] }).nodes.length
                   : 0} nodes in improved flow
               </p>
             </div>

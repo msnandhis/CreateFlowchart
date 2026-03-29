@@ -21,7 +21,7 @@ export function TemplateCard({
   userLiked = false,
   showActions = true,
 }: TemplateCardProps) {
-  const nodeCount = template.data.nodes?.length || 0;
+  const nodeCount = template.nodeCount || template.document.nodes.length || 0;
 
   return (
     <div className={styles.card}>

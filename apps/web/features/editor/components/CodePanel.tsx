@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/shared/ui/Button";
 import { useDocument, useEditorStore } from "../stores/editorStore";
 import {
+  diffDocuments,
   parseDslDocument,
   parseMermaidDocument,
   serializeDocumentToDsl,
@@ -19,47 +20,39 @@ export function CodePanel() {
   const [source, setSource] = useState(() => serializeDocumentToDsl(document));
   const [error, setError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState(false);
-  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [draftSummary, setDraftSummary] = useState<ReturnType<typeof diffDocuments> | null>(null);
+  const [draftDocument, setDraftDocument] = useState<typeof document | null>(null);
 
   useEffect(() => {
     if (mode !== "dsl" || isDirty) return;
     setSource(serializeDocumentToDsl(document));
   }, [document, mode, isDirty]);
 
-  useEffect(() => {
-    if (mode !== "dsl" || !isDirty) return;
-
-    if (syncTimeoutRef.current) {
-      clearTimeout(syncTimeoutRef.current);
-    }
-
-    syncTimeoutRef.current = setTimeout(() => {
-      try {
-        const nextDocument = parseDslDocument(source, {
-          id: document.id,
-          metadata: document.metadata,
-          theme: document.theme,
-          layout: document.layout,
-          annotations: document.annotations,
-        });
-        setDocument(nextDocument);
-        setError(null);
-        setIsDirty(false);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to parse DSL");
-      }
-    }, 300);
-
-    return () => {
-      if (syncTimeoutRef.current) {
-        clearTimeout(syncTimeoutRef.current);
-      }
-    };
-  }, [document.annotations, document.id, document.layout, document.metadata, document.theme, isDirty, mode, setDocument, source]);
-
   const handleChange = (value: string) => {
     setSource(value);
     setIsDirty(true);
+    if (mode !== "dsl") {
+      setDraftSummary(null);
+      setDraftDocument(null);
+      return;
+    }
+
+    try {
+      const nextDocument = parseDslDocument(value, {
+        id: document.id,
+        metadata: document.metadata,
+        theme: document.theme,
+        layout: document.layout,
+        annotations: document.annotations,
+      });
+      setDraftDocument(nextDocument);
+      setDraftSummary(diffDocuments(document, nextDocument));
+      setError(null);
+    } catch (err) {
+      setDraftDocument(null);
+      setDraftSummary(null);
+      setError(err instanceof Error ? err.message : "Failed to parse DSL");
+    }
   };
 
   const applyCurrentSource = () => {
@@ -86,11 +79,11 @@ export function CodePanel() {
             });
 
       setDocument(nextDocument);
-      if (mode === "dsl") {
-        setSource(serializeDocumentToDsl(nextDocument));
-      }
+      setSource(serializeDocumentToDsl(nextDocument));
       setError(null);
       setIsDirty(false);
+      setDraftDocument(null);
+      setDraftSummary(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
     }
@@ -104,6 +97,8 @@ export function CodePanel() {
     );
     setError(null);
     setIsDirty(false);
+    setDraftDocument(null);
+    setDraftSummary(null);
   };
 
   return (
@@ -157,9 +152,30 @@ export function CodePanel() {
       <div className={styles.footer}>
         <span className={styles.hint}>
           {mode === "dsl"
-            ? "Native DSL stays in sync with the canvas."
+            ? "Canvas changes sync into DSL live. DSL edits produce a draft diff before apply."
             : "Paste Mermaid flowchart syntax and import it into the canonical document model."}
         </span>
+        {mode === "dsl" && draftSummary ? (
+          <div className={styles.diffBox}>
+            <div className={styles.diffGrid}>
+              <span>+{draftSummary.nodesAdded} nodes</span>
+              <span>-{draftSummary.nodesRemoved} nodes</span>
+              <span>~{draftSummary.nodesModified} nodes</span>
+              <span>+{draftSummary.edgesAdded} edges</span>
+              <span>-{draftSummary.edgesRemoved} edges</span>
+              <span>+{draftSummary.containersAdded} containers</span>
+            </div>
+            {draftSummary.highlights.length > 0 ? (
+              <div className={styles.highlights}>
+                {draftSummary.highlights.map((highlight, index) => (
+                  <span key={`${highlight}-${index}`} className={styles.highlightItem}>
+                    {highlight}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         {error ? <span className={styles.error}>{error}</span> : null}
       </div>
     </aside>

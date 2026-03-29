@@ -8,6 +8,7 @@ import {
   BackgroundVariant,
   type NodeMouseHandler,
   type EdgeMouseHandler,
+  type NodeDragHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
@@ -30,12 +31,15 @@ export function Canvas({ provider, updateLocalCursor }: CanvasProps) {
   const onNodesChange = useEditorStore((s) => s.onNodesChange);
   const onEdgesChange = useEditorStore((s) => s.onEdgesChange);
   const onConnect = useEditorStore((s) => s.onConnect);
+  const onNodeDragStop = useEditorStore((s) => s.onNodeDragStop);
   const setSelectedNode = useEditorStore((s) => s.setSelectedNode);
   const setSelectedEdge = useEditorStore((s) => s.setSelectedEdge);
   const setSelectedContainer = useEditorStore((s) => s.setSelectedContainer);
 
   const onNodeClick: NodeMouseHandler = (_, node) => setSelectedNode(node.id);
   const onEdgeClick: EdgeMouseHandler = (_, edge) => setSelectedEdge(edge.id);
+  const handleNodeDragStop: NodeDragHandler = (event, node) =>
+    onNodeDragStop(event, node);
 
   const onPaneClick = () => {
     setSelectedNode(null);
@@ -61,6 +65,7 @@ export function Canvas({ provider, updateLocalCursor }: CanvasProps) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeDragStop={handleNodeDragStop}
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}

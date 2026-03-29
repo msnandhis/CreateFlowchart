@@ -1,4 +1,5 @@
 import type { DiagramDocument } from "@createflowchart/schema";
+import { documentToMermaid } from "@createflowchart/dsl";
 import { renderDocumentToSvg } from "@createflowchart/render";
 
 export type ExportFormat = "png" | "svg" | "pdf" | "mermaid" | "json";
@@ -59,39 +60,4 @@ export function exportAsPDFData(document: DiagramDocument): ExportResult {
     content: svgResult.content,
     fileSize: svgResult.fileSize,
   };
-}
-
-function documentToMermaid(document: DiagramDocument): string {
-  const lines: string[] = ["flowchart TD"];
-
-  for (const node of document.nodes) {
-    const label = node.content.title.replace(/"/g, "'");
-    if (node.kind.includes("start") || node.kind.includes("end")) {
-      lines.push(`    ${node.id}(["${label}"])`);
-      continue;
-    }
-
-    if (node.kind.includes("gateway") || node.kind.includes("decision")) {
-      lines.push(`    ${node.id}{"${label}"}`);
-      continue;
-    }
-
-    if (node.kind.includes("automation") || node.kind.includes("service")) {
-      lines.push(`    ${node.id}[/\"${label}\"/]`);
-      continue;
-    }
-
-    lines.push(`    ${node.id}["${label}"]`);
-  }
-
-  for (const edge of document.edges) {
-    const label = edge.labels[0]?.text;
-    lines.push(
-      label
-        ? `    ${edge.sourceNodeId} -->|"${label.replace(/"/g, "'")}"| ${edge.targetNodeId}`
-        : `    ${edge.sourceNodeId} --> ${edge.targetNodeId}`,
-    );
-  }
-
-  return lines.join("\n");
 }
