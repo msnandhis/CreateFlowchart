@@ -1,0 +1,240 @@
+export interface AIJobStatus {
+  id: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  progress: number;
+  result?: unknown;
+  error?: string;
+}
+
+export interface AIGenerateInput {
+  prompt: string;
+  nodeCount?: number;
+}
+
+export interface AIAnalyzeResult {
+  score: number;
+  issues: Array<{
+    type: "error" | "warning" | "suggestion";
+    message: string;
+    nodeIds: string[];
+  }>;
+}
+
+export interface AIImproveResult {
+  changes: Array<{
+    type: "add" | "remove" | "modify";
+    description: string;
+    before?: unknown;
+    after?: unknown;
+  }>;
+  newFlowGraph: unknown;
+}
+
+export interface AIExplainResult {
+  summary: string;
+  steps: Array<{
+    nodeId: string;
+    description: string;
+  }>;
+}
+
+type StatusListener = (status: AIJobStatus) => void;
+
+class AIServiceError extends Error {
+  constructor(
+    message: string,
+    public statusCode: number = 500,
+    public code?: string,
+  ) {
+    super(message);
+    this.name = "AIServiceError";
+  }
+}
+
+class AIService {
+  private statusListeners: Map<string, StatusListener[]> = new Map();
+  private pollingIntervals: Map<string, ReturnType<typeof setInterval>> =
+    new Map();
+
+  private async fetchWithAuth(
+    path: string,
+    options: RequestInit = {},
+  ): Promise<Response> {
+    const response = await fetch(path, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    });
+    return response;
+  }
+
+  async generate(input: AIGenerateInput): Promise<{ jobId: string }> {
+    const response = await this.fetchWithAuth("/api/ai/generate", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+
+    if (!response.ok) {
+      throw new AIServiceError(
+        "Failed to start generation job",
+        response.status,
+        "GENERATE_ERROR",
+      );
+    }
+
+    const data = await response.json();
+    return { jobId: data.jobId };
+  }
+
+  async analyze(flowGraph: unknown): Promise<{ jobId: string }> {
+    const response = await this.fetchWithAuth("/api/ai/analyze", {
+      method: "POST",
+      body: JSON.stringify({ flowGraph }),
+    });
+
+    if (!response.ok) {
+      throw new AIServiceError(
+        "Failed to start analysis job",
+        response.status,
+        "ANALYZE_ERROR",
+      );
+    }
+
+    const data = await response.json();
+    return { jobId: data.jobId };
+  }
+
+  async improve(
+    flowGraph: unknown,
+    instruction: string,
+  ): Promise<{ jobId: string }> {
+    const response = await this.fetchWithAuth("/api/ai/improve", {
+      method: "POST",
+      body: JSON.stringify({ flowGraph, instruction }),
+    });
+
+    if (!response.ok) {
+      throw new AIServiceError(
+        "Failed to start improve job",
+        response.status,
+        "IMPROVE_ERROR",
+      );
+    }
+
+    const data = await response.json();
+    return { jobId: data.jobId };
+  }
+
+  async explain(flowGraph: unknown): Promise<{ jobId: string }> {
+    const response = await this.fetchWithAuth("/api/ai/explain", {
+      method: "POST",
+      body: JSON.stringify({ flowGraph }),
+    });
+
+    if (!response.ok) {
+      throw new AIServiceError(
+        "Failed to start explain job",
+        response.status,
+        "EXPLAIN_ERROR",
+      );
+    }
+
+    const data = await response.json();
+    return { jobId: data.jobId };
+  }
+
+  getJobStatus(jobId: string): AIJobStatus | null {
+    const stored = localStorage.getItem(`ai_job_${jobId}`);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  private setJobStatus(jobId: string, status: AIJobStatus): void {
+    localStorage.setItem(`ai_job_${jobId}`, JSON.stringify(status));
+    const listeners = this.statusListeners.get(jobId) ?? [];
+    listeners.forEach((listener) => listener(status));
+  }
+
+  subscribe(jobId: string, listener: StatusListener): () => void {
+    const listeners = this.statusListeners.get(jobId) ?? [];
+    this.statusListeners.set(jobId, [...listeners, listener]);
+
+    const existing = this.getJobStatus(jobId);
+    if (existing) {
+      listener(existing);
+    }
+
+    return () => {
+      const current = this.statusListeners.get(jobId) ?? [];
+      this.statusListeners.set(
+        jobId,
+        current.filter((l) => l !== listener),
+      );
+    };
+  }
+
+  startPolling(jobId: string, onStatus: StatusListener): void {
+    this.stopPolling(jobId);
+
+    const poll = async () => {
+      try {
+        const response = await this.fetchWithAuth(`/api/ai/status/${jobId}`);
+        if (response.ok) {
+          const status: AIJobStatus = await response.json();
+          this.setJobStatus(jobId, status);
+          onStatus(status);
+
+          if (status.status === "completed" || status.status === "failed") {
+            this.stopPolling(jobId);
+          }
+        }
+      } catch (error) {
+        console.error(`[AIService] Polling error for job ${jobId}:`, error);
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, 2000);
+    this.pollingIntervals.set(jobId, interval);
+  }
+
+  stopPolling(jobId: string): void {
+    const interval = this.pollingIntervals.get(jobId);
+    if (interval) {
+      clearInterval(interval);
+      this.pollingIntervals.delete(jobId);
+    }
+  }
+
+  async waitForCompletion(
+    jobId: string,
+    onStatus: StatusListener,
+  ): Promise<AIJobStatus> {
+    return new Promise((resolve) => {
+      this.subscribe(jobId, (status) => {
+        onStatus(status);
+        if (status.status === "completed" || status.status === "failed") {
+          resolve(status);
+        }
+      });
+      this.startPolling(jobId, onStatus);
+    });
+  }
+
+  cleanup(): void {
+    this.pollingIntervals.forEach((interval) => clearInterval(interval));
+    this.pollingIntervals.clear();
+    this.statusListeners.clear();
+  }
+}
+
+export const aiService = new AIService();
+export { AIServiceError };
