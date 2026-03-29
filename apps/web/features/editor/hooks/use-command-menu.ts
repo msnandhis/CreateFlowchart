@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { NodeType } from "@createflowchart/core";
+import { flowchartPalette } from "../lib/flowchart-shapes";
 
 interface Command {
   id: string;
@@ -44,47 +45,17 @@ export function useCommandMenu({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const addCommands: Command[] = flowchartPalette.map((item) => ({
+    id: `add-${item.legacyType}`,
+    label: `Add ${item.label}`,
+    description: item.description,
+    icon: item.icon,
+    category: "add",
+    action: () => onAddNode(item.legacyType),
+  }));
+
   const commands: Command[] = [
-    {
-      id: "add-start",
-      label: "Add Start Node",
-      description: "Add a start node",
-      icon: "🔵",
-      category: "add",
-      action: () => onAddNode("start"),
-    },
-    {
-      id: "add-process",
-      label: "Add Process Node",
-      description: "Add a process node",
-      icon: "📦",
-      category: "add",
-      action: () => onAddNode("process"),
-    },
-    {
-      id: "add-decision",
-      label: "Add Decision Node",
-      description: "Add a decision node (diamond)",
-      icon: "🔷",
-      category: "add",
-      action: () => onAddNode("decision"),
-    },
-    {
-      id: "add-action",
-      label: "Add Action Node",
-      description: "Add an action node (webhook/API)",
-      icon: "⚡",
-      category: "add",
-      action: () => onAddNode("action"),
-    },
-    {
-      id: "add-end",
-      label: "Add End Node",
-      description: "Add an end node",
-      icon: "🔴",
-      category: "add",
-      action: () => onAddNode("end"),
-    },
+    ...addCommands,
     {
       id: "undo",
       label: "Undo",

@@ -7,6 +7,7 @@ import {
 import { useEditorStore } from "../stores/editorStore";
 import type { NodeType } from "@createflowchart/core";
 import styles from "../styles/command-menu.module.css";
+import { createLegacyPaletteNode } from "../lib/flowchart-shapes";
 
 interface CommandMenuProps extends Omit<
   UseCommandMenuOptions,
@@ -79,19 +80,7 @@ export function CommandMenu({
   });
 
   const addNodeByType = (type: NodeType) => {
-    const id = `node_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const position = {
-      x: Math.random() * 400 + 100,
-      y: Math.random() * 300 + 100,
-    };
-    const label = type.charAt(0).toUpperCase() + type.slice(1);
-
-    useEditorStore.getState().addNode({
-      id,
-      type,
-      position,
-      data: { label, confidence: 1.0, meta: {} },
-    });
+    useEditorStore.getState().addNode(createLegacyPaletteNode(type));
   };
 
   if (!isOpen) return null;

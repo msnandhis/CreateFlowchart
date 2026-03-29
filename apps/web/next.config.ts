@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
     "@createflowchart/core",
     "@createflowchart/ai",
     "@createflowchart/db",
+    "@createflowchart/engine",
     "@createflowchart/schema",
   ],
 
