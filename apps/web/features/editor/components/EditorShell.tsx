@@ -69,6 +69,7 @@ export function EditorShell({
         checkpoints={checkpoints}
         onCreateCheckpoint={() => createCheckpoint()}
         onRestoreCheckpoint={restoreCheckpoint}
+        onAutoLayout={runLayout}
         onOpenGenerate={onOpenGenerate}
         onOpenAnalyze={onOpenAnalyze}
         onOpenExport={onOpenExport}

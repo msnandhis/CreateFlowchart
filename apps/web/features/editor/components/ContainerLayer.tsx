@@ -1,15 +1,18 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { ViewportPortal } from "@xyflow/react";
 import { useEditorStore } from "../stores/editorStore";
 import styles from "../styles/container-layer.module.css";
 
 export const ContainerLayer = memo(function ContainerLayer() {
-  const containers = useEditorStore((state) =>
-    [...state.document.containers].sort(
+  const containers = useEditorStore((state) => state.document.containers);
+  const sortedContainers = useMemo(
+    () =>
+      [...containers].sort(
       (a, b) => b.size.width * b.size.height - a.size.width * a.size.height,
     ),
+    [containers],
   );
   const selectedContainerId = useEditorStore((state) => state.selectedContainerId);
   const setSelectedContainer = useEditorStore((state) => state.setSelectedContainer);
@@ -17,7 +20,7 @@ export const ContainerLayer = memo(function ContainerLayer() {
   return (
     <ViewportPortal>
       <div className={styles.layer}>
-        {containers.map((container) => {
+        {sortedContainers.map((container) => {
           const labelWidth =
             container.type === "pool" || container.type === "lane" ? 42 : 0;
           const bodyLeft = container.position.x + labelWidth;

@@ -11,6 +11,23 @@ import {
 import { MarkerType, type Node, type Edge } from "@xyflow/react";
 import { getShapeDefinition } from "./flowchart-shapes";
 
+function toSourceHandleId(portId?: string) {
+  return portId ? `${portId}__source` : undefined;
+}
+
+function toTargetHandleId(portId?: string) {
+  return portId ? `${portId}__target` : undefined;
+}
+
+function normalizeHandleId(handleId?: string) {
+  if (!handleId) return undefined;
+  return handleId.replace(/__(source|target)$/, "");
+}
+
+function toOptionalHandleId(handleId: string | null | undefined) {
+  return handleId ?? undefined;
+}
+
 export function toDiagramDocument(input: {
   id?: string;
   title?: string;
@@ -150,6 +167,8 @@ export function documentToReactFlow(document: DiagramDocument) {
       id: node.id,
       type: "diagramNode",
       position: node.position,
+      width: node.size.width,
+      height: node.size.height,
       data: {
         label: node.content.title,
         confidence: node.ai?.confidence,
@@ -178,8 +197,8 @@ export function documentToReactFlow(document: DiagramDocument) {
       id: edge.id,
       source: edge.sourceNodeId,
       target: edge.targetNodeId,
-      sourceHandle: edge.sourcePortId,
-      targetHandle: edge.targetPortId,
+      sourceHandle: toSourceHandleId(edge.sourcePortId),
+      targetHandle: toTargetHandleId(edge.targetPortId),
       label: edge.labels[0]?.text,
       animated: edge.kind === "message-flow",
       type: mapRoutingToReactFlow(edge.routing),
@@ -348,9 +367,13 @@ export function reactFlowToDocument(
           baseEdge?.kind ??
           inferredKind,
         sourceNodeId: edge.source,
-        sourcePortId: edge.sourceHandle ?? baseEdge?.sourcePortId,
+        sourcePortId:
+          normalizeHandleId(toOptionalHandleId(edge.sourceHandle)) ??
+          baseEdge?.sourcePortId,
         targetNodeId: edge.target,
-        targetPortId: edge.targetHandle ?? baseEdge?.targetPortId,
+        targetPortId:
+          normalizeHandleId(toOptionalHandleId(edge.targetHandle)) ??
+          baseEdge?.targetPortId,
         routing:
           asEdgeRouting(
             typeof edge.data?.routing === "string" ? edge.data.routing : undefined,

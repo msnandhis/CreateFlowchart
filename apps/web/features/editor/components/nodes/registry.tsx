@@ -121,23 +121,65 @@ function toHandlePosition(side: ShapePortAnchor["side"]) {
   }
 }
 
+function sourceHandleId(anchorId: string) {
+  return `${anchorId}__source`;
+}
+
+function targetHandleId(anchorId: string) {
+  return `${anchorId}__target`;
+}
+
 function buildHandles(anchors: ShapePortAnchor[], kind?: string) {
   const sourceOnly = kind?.includes("start");
   const targetOnly = kind?.includes("end");
 
-  return anchors.map((anchor, index) => {
-    const type: "source" | "target" =
-      sourceOnly ? "source" : targetOnly ? "target" : index === 0 ? "target" : "source";
-
-    return {
-      id: anchor.id,
-      type,
+  return anchors.flatMap((anchor) => {
+    const baseHandle = {
       position: toHandlePosition(anchor.side),
       style: {
-        left: anchor.side === "top" || anchor.side === "bottom" ? `${anchor.x * 100}%` : undefined,
-        top: anchor.side === "left" || anchor.side === "right" ? `${anchor.y * 100}%` : undefined,
+        left:
+          anchor.side === "top" || anchor.side === "bottom"
+            ? `${anchor.x * 100}%`
+            : undefined,
+        top:
+          anchor.side === "left" || anchor.side === "right"
+            ? `${anchor.y * 100}%`
+            : undefined,
       },
     };
+
+    if (sourceOnly) {
+      return [
+        {
+          id: sourceHandleId(anchor.id),
+          type: "source" as const,
+          ...baseHandle,
+        },
+      ];
+    }
+
+    if (targetOnly) {
+      return [
+        {
+          id: targetHandleId(anchor.id),
+          type: "target" as const,
+          ...baseHandle,
+        },
+      ];
+    }
+
+    return [
+      {
+        id: targetHandleId(anchor.id),
+        type: "target" as const,
+        ...baseHandle,
+      },
+      {
+        id: sourceHandleId(anchor.id),
+        type: "source" as const,
+        ...baseHandle,
+      },
+    ];
   });
 }
 

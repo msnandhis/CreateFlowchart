@@ -1,6 +1,12 @@
-import { auth } from "@/shared/lib/auth";
-import { toNextJsHandler } from "better-auth/next-js";
+import { NextResponse } from "next/server";
+import { DEV_SESSION } from "@/shared/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export const { GET, POST } = toNextJsHandler(auth);
+export async function GET() {
+  return NextResponse.json(DEV_SESSION);
+}
+
+export async function POST() {
+  return NextResponse.json(DEV_SESSION);
+}

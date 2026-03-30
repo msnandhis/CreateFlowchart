@@ -1,48 +1,55 @@
-import { betterAuth } from "better-auth";
-import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { db } from "./db";
-import * as schema from "@createflowchart/db";
+export interface DevSessionUser {
+  id: string;
+  email: string;
+  name: string;
+  image?: string | null;
+}
 
-export const auth = betterAuth({
-  database: drizzleAdapter(db, {
-    provider: "pg",
-    schema: {
-      user: schema.users,
-      session: schema.sessions,
-      account: schema.accounts,
-      verification: schema.verifications,
-    },
-  }),
-
-  // ─── Email + Password ────────────────────────────────────────
-  emailAndPassword: {
-    enabled: true,
-    minPasswordLength: 8,
-  },
-
-  // ─── Social Providers ────────────────────────────────────────
-  socialProviders: {
-    github: {
-      clientId: process.env.AUTH_GITHUB_ID || "",
-      clientSecret: process.env.AUTH_GITHUB_SECRET || "",
-    },
-    google: {
-      clientId: process.env.AUTH_GOOGLE_ID || "",
-      clientSecret: process.env.AUTH_GOOGLE_SECRET || "",
-    },
-  },
-
-
-  // ─── Session ─────────────────────────────────────────────────
+export interface DevSession {
+  user: DevSessionUser;
   session: {
-    expiresIn: 60 * 60 * 24 * 7, // 7 days
-    updateAge: 60 * 60 * 24,      // Update session every 24 hours
+    id: string;
+    expiresAt: string;
+  };
+}
+
+const DEFAULT_DEV_SESSION: DevSession = {
+  user: {
+    id: "dev-user",
+    email: "dev@createflowchart.local",
+    name: "Dev User",
+    image: null,
   },
+  session: {
+    id: "dev-session",
+    expiresAt: "2099-12-31T23:59:59.000Z",
+  },
+};
 
-  // ─── Advanced ────────────────────────────────────────────────
-  trustedOrigins: [
-    process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
-  ],
-});
+function sessionFromHeaders(headers?: HeadersInit): DevSession {
+  const source = new Headers(headers);
+  const userId = source.get("x-dev-user-id") ?? DEFAULT_DEV_SESSION.user.id;
+  const email = source.get("x-dev-user-email") ?? DEFAULT_DEV_SESSION.user.email;
+  const name = source.get("x-dev-user-name") ?? DEFAULT_DEV_SESSION.user.name;
 
-export type Session = typeof auth.$Infer.Session;
+  return {
+    user: {
+      id: userId,
+      email,
+      name,
+      image: DEFAULT_DEV_SESSION.user.image,
+    },
+    session: DEFAULT_DEV_SESSION.session,
+  };
+}
+
+export const auth = {
+  api: {
+    async getSession(input?: { headers?: HeadersInit }) {
+      return sessionFromHeaders(input?.headers);
+    },
+  },
+};
+
+export type Session = DevSession;
+export const DEV_SESSION = DEFAULT_DEV_SESSION;

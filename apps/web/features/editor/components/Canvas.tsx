@@ -6,14 +6,22 @@ import {
   Controls,
   MiniMap,
   BackgroundVariant,
+  useNodesInitialized,
+  useReactFlow,
   type NodeMouseHandler,
   type EdgeMouseHandler,
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 
-import { useEditorStore, useNodes, useEdges } from "../stores/editorStore";
-import { nodeTypes } from "./nodes";
+import { useEffect } from "react";
+import {
+  useEditorStore,
+  useNodes,
+  useEdges,
+  useViewportFitRequest,
+} from "../stores/editorStore";
+import nodeTypes from "./nodes";
 import styles from "../styles/canvas.module.css";
 import { PresenceLayer } from "./PresenceLayer";
 import { ContainerLayer } from "./ContainerLayer";
@@ -33,6 +41,35 @@ interface CanvasProps {
   clearLocalCursor?: () => void;
 }
 
+function CanvasViewportSync({
+  fitRequest,
+  nodeCount,
+}: {
+  fitRequest: number;
+  nodeCount: number;
+}) {
+  const nodesInitialized = useNodesInitialized();
+  const { fitView } = useReactFlow();
+
+  useEffect(() => {
+    if (!fitRequest || !nodesInitialized || nodeCount === 0) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() => {
+      void fitView({
+        duration: 360,
+        padding: 0.18,
+        includeHiddenNodes: true,
+      });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [fitRequest, nodeCount, nodesInitialized, fitView]);
+
+  return null;
+}
+
 export function Canvas({
   remoteUsers,
   updateLocalCursor,
@@ -48,6 +85,7 @@ export function Canvas({
   const setSelectedNode = useEditorStore((s) => s.setSelectedNode);
   const setSelectedEdge = useEditorStore((s) => s.setSelectedEdge);
   const setSelectedContainer = useEditorStore((s) => s.setSelectedContainer);
+  const viewportFitRequest = useViewportFitRequest();
 
   const onNodeClick: NodeMouseHandler = (_, node) => setSelectedNode(node.id);
   const onEdgeClick: EdgeMouseHandler = (_, edge) => setSelectedEdge(edge.id);
@@ -110,6 +148,10 @@ export function Canvas({
           pannable
           zoomable
           style={{ width: 160, height: 100 }}
+        />
+        <CanvasViewportSync
+          fitRequest={viewportFitRequest}
+          nodeCount={nodes.length}
         />
         <ContainerLayer />
         <PresenceLayer users={remoteUsers} />

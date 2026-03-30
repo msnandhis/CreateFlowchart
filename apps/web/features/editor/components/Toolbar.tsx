@@ -3,7 +3,6 @@
 import { useEditorStore, useIsDirty } from "../stores/editorStore";
 import { Button } from "@/shared/ui/Button";
 import styles from "../styles/toolbar.module.css";
-import { useLayout } from "../hooks/use-layout";
 import { ConnectionStatus } from "./ConnectionStatus";
 import { PresenceAvatars } from "./PresenceAvatars";
 
@@ -33,6 +32,7 @@ interface ToolbarProps {
   checkpoints?: EditorCheckpoint[];
   onCreateCheckpoint?: () => void;
   onRestoreCheckpoint?: (id: string) => void;
+  onAutoLayout?: () => void;
   onOpenGenerate?: () => void;
   onOpenAnalyze?: () => void;
   onOpenExport?: () => void;
@@ -48,6 +48,7 @@ export function Toolbar({
   checkpoints = [],
   onCreateCheckpoint,
   onRestoreCheckpoint,
+  onAutoLayout,
   onOpenGenerate,
   onOpenAnalyze,
   onOpenExport,
@@ -60,8 +61,6 @@ export function Toolbar({
   const canUndo = useEditorStore((s) => s.canUndo);
   const canRedo = useEditorStore((s) => s.canRedo);
   const isDirty = useIsDirty();
-
-  const { performLayout } = useLayout();
 
   return (
     <div className={styles.toolbar}>
@@ -90,7 +89,7 @@ export function Toolbar({
         <div className={styles.separator} />
 
         <div className={styles.group}>
-        <Button variant="ghost" size="sm" title="Auto Layout" onClick={performLayout}>
+        <Button variant="ghost" size="sm" title="Auto Layout" onClick={onAutoLayout}>
           <LayoutIcon />
         </Button>
         <Button variant="ghost" size="sm" title="AI Generate (/)" onClick={onOpenGenerate}>

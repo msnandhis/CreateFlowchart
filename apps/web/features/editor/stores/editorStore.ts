@@ -63,6 +63,7 @@ interface EditorState {
   flowGraph: FlowGraph;
   rfNodes: Node[];
   rfEdges: Edge[];
+  viewportFitRequest: number;
   flowId: string | null;
   mode: EditorMode;
   isDirty: boolean;
@@ -192,14 +193,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedNodeId: null,
   selectedEdgeId: null,
   selectedContainerId: null,
+  viewportFitRequest: 0,
 
   setFlowGraph: (fg) => {
-    set((s) => syncFromFlowGraph(fg, s.title));
+    set((s) => ({
+      ...syncFromFlowGraph(fg, s.title),
+      viewportFitRequest: s.viewportFitRequest + 1,
+    }));
   },
 
   setDocument: (document) => {
     set((s) => ({
       title: document.metadata.title,
+      viewportFitRequest: s.viewportFitRequest + 1,
       ...syncFromProjection(replaceEditorDocument(s.engineState, document)),
     }));
   },
@@ -223,6 +229,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedNodeId: null,
       selectedEdgeId: null,
       selectedContainerId: null,
+      viewportFitRequest: projection.document.nodes.length > 0 ? 1 : 0,
     });
   },
 
@@ -256,6 +263,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedNodeId: null,
       selectedEdgeId: null,
       selectedContainerId: null,
+      viewportFitRequest: projection.document.nodes.length > 0 ? 1 : 0,
     });
   },
 
@@ -465,6 +473,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       return {
         title: checkpoint.document.metadata.title,
+        viewportFitRequest: s.viewportFitRequest + 1,
         ...syncFromProjection(
           replaceEditorDocument(s.engineState, checkpoint.document),
         ),
@@ -514,6 +523,7 @@ export const useSelectedDocumentEdge = () => {
   return id ? document.edges.find((edge) => edge.id === id) ?? null : null;
 };
 export const useDocument = () => useEditorStore((s) => s.document);
+export const useViewportFitRequest = () => useEditorStore((s) => s.viewportFitRequest);
 export const useSelectedNode = () => {
   const id = useEditorStore((s) => s.selectedNodeId);
   const fg = useEditorStore((s) => s.flowGraph);
