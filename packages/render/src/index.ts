@@ -301,3 +301,5 @@ function escapeXml(text: string): string {
 // ═══════════════════════════════════════════════════════════════════
 
 export { renderModelToSvg, type RenderOptions, type RenderBounds } from "./v3";
+export * from "./canvas/renderer";
+export * from "./interaction/toolManager";

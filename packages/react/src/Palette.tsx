@@ -8,7 +8,7 @@ export interface PaletteProps {
   className?: string;
 }
 
-export function Palette({ shapes = [], kits = [], onShapeDragStart, className }: PaletteProps) {
+export function Palette({ shapes = [], onShapeDragStart, className }: PaletteProps) {
   return (
     <div className={`cf-palette flex flex-col w-64 bg-slate-900 border-r border-slate-800 p-4 ${className || ""}`}>
       <h3 className="text-sm font-semibold text-slate-300 mb-4 uppercase tracking-wider">Shapes</h3>
@@ -23,7 +23,7 @@ export function Palette({ shapes = [], kits = [], onShapeDragStart, className }:
               onShapeDragStart?.(shape.id);
             }}
           >
-            <span className="text-2xl mb-1">{shape.metadata?.icon || "⬜"}</span>
+            <span className="text-2xl mb-1">{((shape.metadata?.icon as string) || "⬜")}</span>
             <span className="text-xs text-slate-400 text-center">{shape.displayName}</span>
           </div>
         ))}

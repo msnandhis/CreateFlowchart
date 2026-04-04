@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { DiagramModel, DiagramEngine, createEngine, LayoutAlgorithm } from "@createflowchart/schema";
-import { renderModelToSvg } from "@createflowchart/render/src/v3";
-import { LayoutEngine } from "@createflowchart/layout/src/engine";
+import React, { useEffect, useRef, useState } from "react";
+import { DiagramModel, DiagramEngine, createEngine } from "@createflowchart/schema";
+import { CanvasRenderer, ToolManager } from "@createflowchart/render";
+import { createLayoutEngine } from "@createflowchart/layout";
 
 export interface DiagramProps {
   model: DiagramModel;
@@ -22,58 +22,99 @@ export function Diagram({
   className,
   style,
 }: DiagramProps) {
-  // We initialize the engine once
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<DiagramEngine | null>(null);
+  const rendererRef = useRef<CanvasRenderer | null>(null);
+  const toolManagerRef = useRef<ToolManager | null>(null);
+
   const [model, setModel] = useState<DiagramModel>(initialModel);
 
-  // Re-sync engine when initialModel props change radically,
-  // but generally DiagramEngine manages the state.
+  // 1. Initialize Engine & Canvas Pipeline
   useEffect(() => {
-    if (!engineRef.current) {
-      engineRef.current = createEngine({ initialModel });
-      engineRef.current.on("modelChanged", (event) => {
-        const m = engineRef.current!.getModel();
-        setModel(m);
-        onModelChange?.(m);
+    if (!canvasRef.current) return;
+
+    // Create DiagramEngine
+    const engine = createEngine({ initialModel });
+    engineRef.current = engine;
+
+    // Create Renderer
+    const renderer = new CanvasRenderer(canvasRef.current);
+    rendererRef.current = renderer;
+    renderer.setModel(engine.getModel());
+
+    // Create ToolManager
+    const toolManager = new ToolManager(canvasRef.current, renderer, engine);
+    toolManagerRef.current = toolManager;
+
+    // Bind engine changes to state and renderer
+    const unsubscribe = engine.on("modelChanged", () => {
+      const updatedModel = engine.getModel();
+      setModel(updatedModel);
+      renderer.setModel(updatedModel);
+      onModelChange?.(updatedModel);
+    });
+
+    const unsubscribeClick = engine.on("selection:changed", (event: any) => {
+      if (event.payload?.ids?.length === 1) {
+        onNodeClick?.(event.payload.ids[0]);
+      }
+    });
+
+    // Cleanup on unmount
+    return () => {
+      unsubscribe();
+      unsubscribeClick();
+      toolManager.destroy();
+      renderer.destroy();
+      engineRef.current = null;
+      rendererRef.current = null;
+      toolManagerRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run essentially once on mount
+
+  // 2. Handle programmatic model updates from props (e.g. initial generation)
+  // If the parent passes a completely new initialModel that isn't our internal state
+  useEffect(() => {
+    if (initialModel !== model && engineRef.current) {
+      engineRef.current.batch("Update model from props", (e) => {
+        // Simple full replacement for MVP. A robust version would diff.
+        // Or if we trust Yjs, we listen to Yjs events instead.
+        e.replaceModel(initialModel);
       });
     }
-  }, [initialModel, onModelChange]);
+  }, [initialModel, model]);
 
-  // Handle auto-layout
+  // 3. Handle Auto-Layout
   useEffect(() => {
     if (layout && engineRef.current) {
-      const layoutEngine = new LayoutEngine();
-      // Apply layout
+      const layoutEngine = createLayoutEngine();
       try {
-        const newModel = layoutEngine.layout(engineRef.current.getModel(), layout, layoutOptions);
-        // We'd ideally dispatch this through the engine's command system
-        // For MVP wrapper we just update state
-        setModel(newModel);
+        const currentModel = engineRef.current.getModel();
+        const newModel = layoutEngine.applyAlgorithm(layout, currentModel, layoutOptions);
+        
+        // Push layout changes into engine
+        engineRef.current.batch("Auto Layout", (e) => {
+          for (const node of newModel.nodes) {
+            e.moveNode(node.id, node.position);
+          }
+        });
       } catch (err) {
         console.error("Layout failed:", err);
       }
     }
   }, [layout, layoutOptions, model.nodes.length]);
 
-  // Render to SVG
-  const svgString = useMemo(() => {
-    return renderModelToSvg(model, { showPorts: false });
-  }, [model]);
-
   return (
     <div 
-      className={className} 
-      style={{ width: "100%", height: "100%", overflow: "auto", ...style }}
-      dangerouslySetInnerHTML={{ __html: svgString }}
-      onClick={(e) => {
-        // Basic delegation for click events
-        const target = e.target as HTMLElement;
-        const nodeG = target.closest(".cf-node") as HTMLElement;
-        if (nodeG) {
-          const id = nodeG.getAttribute("data-id");
-          if (id) onNodeClick?.(id);
-        }
-      }}
-    />
+      className={`cf-diagram-wrapper relative w-full h-full overflow-hidden ${className || ""}`}
+      style={style}
+    >
+      <canvas 
+        ref={canvasRef} 
+        style={{ width: "100%", height: "100%", touchAction: "none" }} 
+      />
+    </div>
   );
 }
+
