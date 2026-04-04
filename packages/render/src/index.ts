@@ -3,8 +3,8 @@ import {
   flowchartShapes,
   type DiagramContainer,
   type DiagramDocument,
-  type DiagramEdge,
-  type DiagramNode,
+  type DiagramEdgeV2 as DiagramEdge,
+  type DiagramNodeV2 as DiagramNode,
   type ShapeDefinition,
 } from "@createflowchart/schema";
 
@@ -295,3 +295,9 @@ function escapeXml(text: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// v3 Renderer (DiagramModel)
+// ═══════════════════════════════════════════════════════════════════
+
+export { renderModelToSvg, type RenderOptions, type RenderBounds } from "./v3";

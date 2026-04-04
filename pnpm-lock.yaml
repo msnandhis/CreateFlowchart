@@ -277,6 +277,19 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
+  packages/layout:
+    dependencies:
+      '@createflowchart/schema':
+        specifier: workspace:*
+        version: link:../schema
+    devDependencies:
+      '@createflowchart/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
   packages/render:
     dependencies:
       '@createflowchart/schema':

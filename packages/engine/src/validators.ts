@@ -1,8 +1,8 @@
 import type {
   DiagramDocument,
-  DiagramEdge,
+  DiagramEdgeV2 as DiagramEdge,
   DiagramContainer,
-  DiagramNode,
+  DiagramNodeV2 as DiagramNode,
 } from "@createflowchart/schema";
 import type { EngineValidationIssue, EngineValidator } from "./types";
 

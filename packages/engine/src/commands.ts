@@ -1,9 +1,9 @@
 import type {
-  DiagramAnnotation,
+  DiagramAnnotationV2 as DiagramAnnotation,
   DiagramContainer,
   DiagramDocument,
-  DiagramEdge,
-  DiagramNode,
+  DiagramEdgeV2 as DiagramEdge,
+  DiagramNodeV2 as DiagramNode,
 } from "@createflowchart/schema";
 import { withCommittedChange } from "./history";
 import type { EngineSelection, EngineState } from "./types";
