@@ -29,3 +29,4 @@ pnpm-debug.log*
 # Docker
 pg_data/
 redis_data/
+docs/impl2.md
