@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Input } from "@/shared/ui/Input";
 import { Button } from "@/shared/ui/Button";
 import styles from "../styles/action-node.module.css";
-import type { ActionConfig } from "@createflowchart/legacy";
+import type { AutomationConfig } from "@createflowchart/schema";
 
 interface ActionNodeConfigPanelProps {
   nodeId: string;
-  config: ActionConfig | undefined;
-  onSave: (config: ActionConfig) => void;
+  config: AutomationConfig | undefined;
+  onSave: (config: AutomationConfig) => void;
   onCancel: () => void;
 }
 
@@ -19,7 +19,7 @@ export function ActionNodeConfigPanel({
   onSave,
   onCancel,
 }: ActionNodeConfigPanelProps) {
-  const [webhookUrl, setWebhookUrl] = useState(config?.webhook_url || "");
+  const [endpoint, setEndpoint] = useState(config?.endpoint || "");
   const [method, setMethod] = useState<"GET" | "POST" | "PUT" | "PATCH" | "DELETE">(
     config?.method || "POST",
   );
@@ -27,7 +27,7 @@ export function ActionNodeConfigPanel({
     config?.headers || {},
   );
   const [payloadTemplate, setPayloadTemplate] = useState(
-    config?.payload_template || "",
+    config?.payloadTemplate || "",
   );
   const [newHeaderKey, setNewHeaderKey] = useState("");
   const [newHeaderValue, setNewHeaderValue] = useState("");
@@ -36,13 +36,13 @@ export function ActionNodeConfigPanel({
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!webhookUrl.trim()) {
-      newErrors.webhookUrl = "Webhook URL is required";
+    if (!endpoint.trim()) {
+      newErrors.endpoint = "Endpoint URL is required";
     } else {
       try {
-        new URL(webhookUrl);
+        new URL(endpoint);
       } catch {
-        newErrors.webhookUrl = "Invalid URL format";
+        newErrors.endpoint = "Invalid URL format";
       }
     }
 
@@ -54,10 +54,11 @@ export function ActionNodeConfigPanel({
     if (!validate()) return;
 
     onSave({
-      webhook_url: webhookUrl.trim(),
+      actionType: "http",
+      endpoint: endpoint.trim(),
       method,
       headers,
-      payload_template: payloadTemplate.trim() || undefined,
+      payloadTemplate: payloadTemplate.trim() || undefined,
     });
   };
 
@@ -82,7 +83,7 @@ export function ActionNodeConfigPanel({
   return (
     <div className={styles.panel}>
       <div className={styles.header}>
-        <h3 className={styles.title}>Configure Action</h3>
+        <h3 className={styles.title}>Configure Automation</h3>
         <button className={styles.closeButton} onClick={onCancel}>
           <svg
             width="18"
@@ -100,14 +101,14 @@ export function ActionNodeConfigPanel({
 
       <div className={styles.content}>
         <div className={styles.section}>
-          <label className={styles.label}>Webhook URL *</label>
+          <label className={styles.label}>Endpoint URL *</label>
           <Input
             placeholder="https://api.example.com/webhook"
-            value={webhookUrl}
-            onChange={(e) => setWebhookUrl(e.target.value)}
+            value={endpoint}
+            onChange={(e) => setEndpoint(e.target.value)}
           />
-          {errors.webhookUrl && (
-            <span className={styles.errorText}>{errors.webhookUrl}</span>
+          {errors.endpoint && (
+            <span className={styles.errorText}>{errors.endpoint}</span>
           )}
         </div>
 
@@ -135,6 +136,7 @@ export function ActionNodeConfigPanel({
                 <span className={styles.headerValue}>{value}</span>
                 <button
                   className={styles.removeButton}
+                  type="button"
                   onClick={() => handleRemoveHeader(key)}
                 >
                   ×

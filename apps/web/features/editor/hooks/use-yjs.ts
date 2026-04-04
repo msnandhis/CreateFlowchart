@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { useEditorStore } from "../stores/editorStore";
-import type { DiagramDocument } from "@createflowchart/schema";
+import type { DiagramModel } from "@createflowchart/schema";
 import { useSession } from "@/shared/lib/auth-client";
 
 const REALTIME_URL =
@@ -30,12 +30,15 @@ export function useYjs(flowId: string | null) {
     "disconnected" | "connecting" | "connected"
   >("disconnected");
   const [authToken, setAuthToken] = useState<string | null>(null);
-  const document = useEditorStore((s) => s.document);
-  const setDocument = useEditorStore((s) => s.setDocument);
+  
+  // v3 use 'model' instead of 'document'
+  const model = useEditorStore((s) => s.model);
+  const setModel = useEditorStore((s) => s.loadFlow);
+  
   const ydocRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
   const isLocalUpdateRef = useRef(false);
-  const lastSerializedDocumentRef = useRef<string | null>(null);
+  const lastSerializedModelRef = useRef<string | null>(null);
   const userIdRef = useRef<string>(
     `user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   );
@@ -131,13 +134,13 @@ export function useYjs(flowId: string | null) {
       isLocalUpdateRef.current = true;
       try {
         const serialized = yDiagram.get("document");
-        if (!serialized || serialized === lastSerializedDocumentRef.current) {
+        if (!serialized || serialized === lastSerializedModelRef.current) {
           return;
         }
 
-        const nextDocument = JSON.parse(serialized) as DiagramDocument;
-        lastSerializedDocumentRef.current = serialized;
-        setDocument(nextDocument);
+        const nextModel = JSON.parse(serialized) as DiagramModel;
+        lastSerializedModelRef.current = serialized;
+        setModel(nextModel);
       } finally {
         isLocalUpdateRef.current = false;
       }
@@ -149,9 +152,9 @@ export function useYjs(flowId: string | null) {
       if (isSynced) {
         const serialized = yDiagram.get("document");
         if (serialized) {
-          const syncedDocument = JSON.parse(serialized) as DiagramDocument;
-          lastSerializedDocumentRef.current = serialized;
-          setDocument(syncedDocument);
+          const syncedModel = JSON.parse(serialized) as DiagramModel;
+          lastSerializedModelRef.current = serialized;
+          setModel(syncedModel);
         }
       }
     };
@@ -165,14 +168,15 @@ export function useYjs(flowId: string | null) {
       doc.destroy();
       setConnectionStatus("disconnected");
     };
-  }, [authToken, flowId, session, setDocument, userName]);
+  }, [authToken, flowId, session, setModel, userName]);
 
   useEffect(() => {
     const doc = ydocRef.current;
     if (!doc || isLocalUpdateRef.current) return;
 
     const yDiagram = doc.getMap<string>("diagram");
-    const serialized = JSON.stringify(document);
+    // Serialize the v3 model
+    const serialized = JSON.stringify(model);
     if (yDiagram.get("document") === serialized) {
       return;
     }
@@ -180,8 +184,8 @@ export function useYjs(flowId: string | null) {
     doc.transact(() => {
       yDiagram.set("document", serialized);
     }, "local");
-    lastSerializedDocumentRef.current = serialized;
-  }, [document]);
+    lastSerializedModelRef.current = serialized;
+  }, [model]);
 
   return {
     provider: providerRef.current,

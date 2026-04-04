@@ -4,7 +4,8 @@ import { CanvasRenderer, ToolManager } from "@createflowchart/render";
 import { createLayoutEngine } from "@createflowchart/layout";
 
 export interface DiagramProps {
-  model: DiagramModel;
+  model?: DiagramModel;
+  engine?: DiagramEngine;
   layout?: string;
   layoutOptions?: any;
   onModelChange?: (model: DiagramModel) => void;
@@ -15,6 +16,7 @@ export interface DiagramProps {
 
 export function Diagram({
   model: initialModel,
+  engine: externalEngine,
   layout,
   layoutOptions,
   onModelChange,
@@ -27,14 +29,14 @@ export function Diagram({
   const rendererRef = useRef<CanvasRenderer | null>(null);
   const toolManagerRef = useRef<ToolManager | null>(null);
 
-  const [model, setModel] = useState<DiagramModel>(initialModel);
+  const [model, setModel] = useState<DiagramModel>(initialModel || externalEngine?.getModel() || ({} as DiagramModel));
 
   // 1. Initialize Engine & Canvas Pipeline
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    // Create DiagramEngine
-    const engine = createEngine({ initialModel });
+    // Use external engine or create a new one
+    const engine = externalEngine || createEngine({ model: initialModel });
     engineRef.current = engine;
 
     // Create Renderer
@@ -91,8 +93,10 @@ export function Diagram({
       const layoutEngine = createLayoutEngine();
       try {
         const currentModel = engineRef.current.getModel();
+        if (!currentModel) return;
+
         const newModel = layoutEngine.applyAlgorithm(layout, currentModel, layoutOptions);
-        
+
         // Push layout changes into engine
         engineRef.current.batch("Auto Layout", (e) => {
           for (const node of newModel.nodes) {

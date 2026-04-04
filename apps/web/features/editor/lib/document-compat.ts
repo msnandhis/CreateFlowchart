@@ -1,507 +1,72 @@
-import type { FlowGraph } from "@createflowchart/legacy";
 import {
-  createDiagramDocument,
+  createDiagramModel,
   migrateLegacyFlowGraph,
+  type DiagramModel,
   type DiagramFamily,
-  type DiagramNode,
-  type DiagramDocument,
-  type EdgeRouting,
-  type Marker,
 } from "@createflowchart/schema";
-import { MarkerType, type Node, type Edge } from "@xyflow/react";
-import { getShapeDefinition } from "./flowchart-shapes";
+import type { FlowGraph } from "@createflowchart/legacy";
 
-function toSourceHandleId(portId?: string) {
-  return portId ? `${portId}__source` : undefined;
-}
-
-function toTargetHandleId(portId?: string) {
-  return portId ? `${portId}__target` : undefined;
-}
-
-function normalizeHandleId(handleId?: string) {
-  if (!handleId) return undefined;
-  return handleId.replace(/__(source|target)$/, "");
-}
-
-function toOptionalHandleId(handleId: string | null | undefined) {
-  return handleId ?? undefined;
-}
-
+/**
+ * Ensures the input data is a valid DiagramModel (v3).
+ * If it's a legacy FlowGraph (v1), it migrates it.
+ */
 export function toDiagramDocument(input: {
   id?: string;
   title?: string;
-  data: FlowGraph | DiagramDocument;
+  data: FlowGraph | DiagramModel;
   authorId?: string;
-}): DiagramDocument {
-  if (isDiagramDocument(input.data)) {
+}): DiagramModel {
+  if (isDiagramModel(input.data)) {
     return input.data;
   }
 
-  return migrateLegacyFlowGraph(input.data, {
+  // Migrate legacy FlowGraph (v1) to DiagramModel (v3)
+  return migrateLegacyFlowGraph(input.data as FlowGraph, {
     id: input.id,
     title: input.title,
     authorId: input.authorId,
   });
 }
 
-export function isDiagramDocument(value: unknown): value is DiagramDocument {
+/**
+ * Type guard for DiagramModel (v3)
+ */
+export function isDiagramModel(value: unknown): value is DiagramModel {
   return (
     typeof value === "object" &&
     value !== null &&
     "version" in value &&
-    (value as { version?: unknown }).version === 2 &&
-    "family" in value &&
+    (value as { version?: unknown }).version === 3 &&
+    "meta" in value &&
     "nodes" in value &&
     "edges" in value
   );
 }
 
-export function createBlankFlowchartDocument(title = "Untitled Diagram"): DiagramDocument {
-  return createDiagramDocument({
-    family: "flowchart",
-    kit: "core-flowchart",
-    metadata: {
-      title,
-      source: "native",
-      tags: [],
-    },
-  });
-}
-
-export function documentToFlowGraph(document: DiagramDocument): FlowGraph {
-  const nodes: FlowGraph["nodes"] = document.nodes.map((node) => {
-    const type = mapDocumentNodeToLegacyType(node);
-
-    const legacyMethod: "GET" | "POST" | "PUT" | "DELETE" =
-      node.automation?.method === "GET" ||
-      node.automation?.method === "PUT" ||
-      node.automation?.method === "DELETE"
-        ? node.automation.method
-        : "POST";
-
-    return {
-      id: node.id,
-      type,
-      position: node.position,
-      data: {
-        label: node.content.title,
-        confidence: node.ai?.confidence ?? 1,
-        meta: node.metadata,
-        action: node.automation?.endpoint
-          ? {
-              webhook_url: node.automation.endpoint,
-              method: legacyMethod,
-              headers: node.automation.headers,
-              payload_template: node.automation.payloadTemplate,
-            }
-          : undefined,
-      },
-    };
-  });
-
-  const edges: FlowGraph["edges"] = document.edges.map((edge) => ({
-    id: edge.id,
-    source: edge.sourceNodeId,
-    target: edge.targetNodeId,
-    label: edge.labels[0]?.text,
-    confidence: edge.ai?.confidence,
-  }));
-
-  return {
-    nodes,
-    edges,
+/**
+ * Creates a new blank diagram using the v3 factory.
+ */
+export function createBlankFlowchartDocument(title = "Untitled Diagram"): DiagramModel {
+  return createDiagramModel({
     meta: {
-      version: 1,
-      createdBy: document.metadata.authorId,
-      isSandbox: false,
+      title,
+      family: "flowchart",
+      kit: "core-flowchart",
+      source: "manual",
     },
-  };
-}
-
-function mapDocumentNodeToLegacyType(
-  node: DiagramDocument["nodes"][number],
-): FlowGraph["nodes"][number]["type"] {
-  if (
-    node.kind === "start-event" ||
-    node.shape === "terminator-start" ||
-    node.shape === "bpmn-start-event"
-  ) {
-    return "start";
-  }
-
-  if (
-    node.kind === "end-event" ||
-    node.shape === "terminator-end" ||
-    node.shape === "bpmn-end-event"
-  ) {
-    return "end";
-  }
-
-  if (
-    node.kind === "decision-gateway" ||
-    node.kind === "exclusive-gateway" ||
-    node.kind === "parallel-gateway" ||
-    node.shape === "decision" ||
-    node.shape === "bpmn-exclusive-gateway" ||
-    node.shape === "bpmn-parallel-gateway"
-  ) {
-    return "decision";
-  }
-
-  if (
-    node.kind === "automation-task" ||
-    node.kind === "service-task" ||
-    node.shape === "action-task" ||
-    node.shape === "bpmn-service-task"
-  ) {
-    return "action";
-  }
-
-  return "process";
-}
-
-export function documentToReactFlow(document: DiagramDocument) {
-  return {
-    nodes: document.nodes.map((node) => ({
-      id: node.id,
-      type: "diagramNode",
-      position: node.position,
-      width: node.size.width,
-      height: node.size.height,
-      data: {
-        label: node.content.title,
-        confidence: node.ai?.confidence,
-        family: node.family,
-        kind: node.kind,
-        shapeId: node.shape,
-        size: node.size,
-        style: node.style,
-        automation: node.automation,
-        meta: {
-          ...node.metadata,
-          family: node.family,
-          semanticKind: node.kind,
-          shapeId: node.shape,
-        },
-      },
-      style: {
-        width: node.size.width,
-        height: node.size.height,
-        background: node.style.fill,
-        borderColor: node.style.stroke,
-        color: node.style.textColor,
-      },
-    })),
-    edges: document.edges.map((edge) => ({
-      id: edge.id,
-      source: edge.sourceNodeId,
-      target: edge.targetNodeId,
-      sourceHandle: toSourceHandleId(edge.sourcePortId),
-      targetHandle: toTargetHandleId(edge.targetPortId),
-      label: edge.labels[0]?.text,
-      animated: edge.kind === "message-flow",
-      type: mapRoutingToReactFlow(edge.routing),
-      markerStart: toReactFlowMarker(edge.startMarker),
-      markerEnd: toReactFlowMarker(edge.endMarker),
-      data: {
-        confidence: edge.ai?.confidence,
-        family: edge.family,
-        kind: edge.kind,
-        routing: edge.routing,
-        startMarker: edge.startMarker,
-        endMarker: edge.endMarker,
-      },
-      style: {
-        stroke:
-          edge.style.stroke ??
-          (edge.kind === "message-flow"
-            ? "var(--color-node-action)"
-            : "var(--color-node-process)"),
-        strokeWidth:
-          edge.ai?.confidence !== undefined && edge.ai.confidence < 0.7 ? 2.5 : 2,
-        strokeDasharray:
-          edge.kind === "message-flow" || edge.kind === "association" ? "6 4" : undefined,
-      },
-    })),
-  };
-}
-
-export function reactFlowToDocument(
-  nodes: Node[],
-  edges: Edge[],
-  baseDocument?: DiagramDocument,
-): DiagramDocument {
-  const baseNodeMap = new Map(
-    (baseDocument?.nodes ?? []).map((node) => [node.id, node]),
-  );
-  const reactNodeMap = new Map(nodes.map((node) => [node.id, node]));
-
-  return createDiagramDocument({
-    id: baseDocument?.id,
-    family: baseDocument?.family ?? "flowchart",
-    kit: baseDocument?.kit ?? "core-flowchart",
-    metadata: {
-      title: baseDocument?.metadata.title ?? "Untitled Diagram",
-      authorId: baseDocument?.metadata.authorId,
-      source: baseDocument?.metadata.source ?? "native",
-      tags: baseDocument?.metadata.tags ?? [],
-      description: baseDocument?.metadata.description,
-      createdAt: baseDocument?.metadata.createdAt,
-      updatedAt: baseDocument?.metadata.updatedAt,
-    },
-    layout: baseDocument?.layout,
-    theme: baseDocument?.theme,
-    containers: baseDocument?.containers ?? [],
-    annotations: baseDocument?.annotations ?? [],
-    nodes: nodes.map((node) => {
-      const baseNode = baseNodeMap.get(node.id);
-      const meta = (node.data?.meta as Record<string, unknown> | undefined) ?? {};
-      const shapeId =
-        (typeof node.data?.shapeId === "string" ? node.data.shapeId : undefined) ??
-        (typeof meta.shapeId === "string" ? meta.shapeId : undefined) ??
-        baseNode?.shape ??
-        "process";
-      const shapeDefinition = getShapeDefinition(shapeId);
-      const family =
-        asDiagramFamily(
-          typeof node.data?.family === "string" ? node.data.family : undefined,
-        ) ??
-        asDiagramFamily(
-          typeof meta.family === "string" ? meta.family : undefined,
-        ) ??
-        shapeDefinition?.family ??
-        baseNode?.family ??
-        baseDocument?.family ??
-        "flowchart";
-      const kind =
-        (typeof node.data?.kind === "string" ? node.data.kind : undefined) ??
-        (typeof meta.semanticKind === "string" ? meta.semanticKind : undefined) ??
-        shapeDefinition?.kind ??
-        baseNode?.kind ??
-        "process-step";
-      const width = extractNodeDimension(node, "width") ??
-        baseNode?.size.width ??
-        shapeDefinition?.defaultWidth ??
-        180;
-      const height = extractNodeDimension(node, "height") ??
-        baseNode?.size.height ??
-        shapeDefinition?.defaultHeight ??
-        64;
-
-      const nextNode: DiagramNode = {
-        id: node.id,
-        family,
-        kind,
-        shape: shapeId,
-        position: node.position,
-        size: { width, height },
-        ports:
-          shapeDefinition?.portAnchors.map((anchor) => ({
-            id: anchor.id,
-            side: anchor.side,
-            accepts: [],
-            metadata: {
-              anchor,
-            },
-          })) ??
-          baseNode?.ports ??
-          [],
-        content: {
-          title:
-            (typeof node.data?.label === "string" ? node.data.label : undefined) ??
-            baseNode?.content.title ??
-            "Untitled",
-          subtitle: baseNode?.content.subtitle,
-          body: baseNode?.content.body,
-          labels: baseNode?.content.labels ?? [],
-        },
-        style: baseNode?.style ?? { tokens: {} },
-        resizePolicy:
-          shapeDefinition?.resizePolicy ?? baseNode?.resizePolicy ?? "content",
-        metadata: {
-          ...baseNode?.metadata,
-          ...meta,
-          family,
-          semanticKind: kind,
-          shapeId,
-        },
-        automation:
-          (node.data?.automation as DiagramNode["automation"] | undefined) ??
-          baseNode?.automation,
-        ai:
-          node.data?.confidence !== undefined
-            ? {
-                ...(baseNode?.ai ?? { notes: [] }),
-                confidence: Number(node.data.confidence),
-              }
-            : baseNode?.ai,
-      };
-
-      return nextNode;
-    }),
-    edges: edges.map((edge) => {
-      const baseEdge =
-        baseDocument?.edges.find((base) => base.id === edge.id) ?? undefined;
-      const sourceNode = reactNodeMap.get(edge.source);
-      const sourceFamily =
-        asDiagramFamily(
-          typeof sourceNode?.data?.family === "string" ? sourceNode.data.family : undefined,
-        ) ?? baseEdge?.family ?? baseDocument?.family ?? "flowchart";
-      const inferredKind = inferEdgeKind(
-        sourceFamily,
-        typeof edge.label === "string" ? edge.label : undefined,
-      );
-
-      return {
-        id: edge.id,
-        family:
-          asDiagramFamily(
-            typeof edge.data?.family === "string" ? edge.data.family : undefined,
-          ) ??
-          baseEdge?.family ??
-          baseDocument?.family ??
-          "flowchart",
-        kind:
-          (typeof edge.data?.kind === "string" ? edge.data.kind : undefined) ??
-          baseEdge?.kind ??
-          inferredKind,
-        sourceNodeId: edge.source,
-        sourcePortId:
-          normalizeHandleId(toOptionalHandleId(edge.sourceHandle)) ??
-          baseEdge?.sourcePortId,
-        targetNodeId: edge.target,
-        targetPortId:
-          normalizeHandleId(toOptionalHandleId(edge.targetHandle)) ??
-          baseEdge?.targetPortId,
-        routing:
-          asEdgeRouting(
-            typeof edge.data?.routing === "string" ? edge.data.routing : undefined,
-          ) ??
-          baseEdge?.routing ??
-          "orthogonal",
-        waypoints: baseEdge?.waypoints ?? [],
-        labels: edge.label
-          ? [{ text: String(edge.label), position: "center" }]
-          : baseEdge?.labels ?? [],
-        startMarker: baseEdge?.startMarker ?? "none",
-        endMarker:
-          baseEdge?.endMarker ??
-          (inferredKind === "conditional-flow" ? "diamond" : "arrow"),
-        style: baseEdge?.style ?? { tokens: {} },
-        metadata: baseEdge?.metadata ?? {},
-        ai:
-          edge.data?.confidence !== undefined
-            ? {
-                ...(baseEdge?.ai ?? { notes: [] }),
-                confidence: Number(edge.data.confidence),
-              }
-            : baseEdge?.ai,
-      };
-    }),
   });
 }
 
-function extractNodeDimension(
-  node: Node,
-  dimension: "width" | "height",
-): number | undefined {
-  const styleValue = node.style?.[dimension];
-
-  if (typeof styleValue === "number") {
-    return styleValue;
-  }
-
-  if (typeof styleValue === "string") {
-    const parsed = Number.parseFloat(styleValue);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  }
-
-  const dataSize =
-    typeof node.data?.size === "object" && node.data.size !== null
-      ? (node.data.size as { width?: number; height?: number })
-      : undefined;
-
-  return dataSize?.[dimension];
-}
-
-const DIAGRAM_FAMILIES: DiagramFamily[] = [
-  "flowchart",
-  "bpmn",
-  "swimlane",
-  "sequence",
-  "state",
-  "er",
-  "class",
-  "c4",
-  "architecture",
-  "dataflow",
-  "mindmap",
-  "orgchart",
-  "timeline",
-  "journey",
-  "sankey",
-  "custom",
-];
-
-const EDGE_ROUTINGS: EdgeRouting[] = [
-  "straight",
-  "orthogonal",
-  "smooth",
-  "bezier",
-  "manual",
-];
-
-function asDiagramFamily(value: string | undefined): DiagramFamily | undefined {
-  return value && DIAGRAM_FAMILIES.includes(value as DiagramFamily)
+/**
+ * Helper to get a family type safely
+ */
+export function asDiagramFamily(value: string | undefined): DiagramFamily {
+  const families: DiagramFamily[] = [
+    "flowchart", "bpmn", "swimlane", "sequence", "state", "er", "class", 
+    "c4", "architecture", "dataflow", "mindmap", "orgchart", "timeline", 
+    "journey", "sankey", "custom"
+  ];
+  return (value && families.includes(value as DiagramFamily))
     ? (value as DiagramFamily)
-    : undefined;
-}
-
-function asEdgeRouting(value: string | undefined): EdgeRouting | undefined {
-  return value && EDGE_ROUTINGS.includes(value as EdgeRouting)
-    ? (value as EdgeRouting)
-    : undefined;
-}
-
-function mapRoutingToReactFlow(routing: EdgeRouting): "default" | "straight" | "step" | "smoothstep" {
-  switch (routing) {
-    case "straight":
-      return "straight";
-    case "orthogonal":
-      return "step";
-    case "smooth":
-      return "smoothstep";
-    case "bezier":
-      return "default";
-    case "manual":
-      return "straight";
-    default:
-      return "smoothstep";
-  }
-}
-
-function toReactFlowMarker(marker: Marker) {
-  switch (marker) {
-    case "arrow":
-    case "triangle":
-      return { type: MarkerType.ArrowClosed };
-    case "circle":
-      return { type: MarkerType.ArrowClosed, width: 18, height: 18 };
-    case "diamond":
-      return { type: MarkerType.Arrow };
-    default:
-      return undefined;
-  }
-}
-
-function inferEdgeKind(
-  family: DiagramFamily,
-  label?: string,
-): string {
-  if (family === "bpmn") {
-    return label ? "message-flow" : "flow";
-  }
-
-  return label ? "conditional-flow" : "flow";
+    : "flowchart";
 }
