@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Transpile workspace packages
   transpilePackages: [
-    "@createflowchart/core",
+    "@createflowchart/legacy",
     "@createflowchart/ai",
     "@createflowchart/db",
     "@createflowchart/dsl",

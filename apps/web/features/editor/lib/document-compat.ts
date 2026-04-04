@@ -1,4 +1,4 @@
-import type { FlowGraph } from "@createflowchart/core";
+import type { FlowGraph } from "@createflowchart/legacy";
 import {
   createDiagramDocument,
   migrateLegacyFlowGraph,

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { EditorShell } from "./EditorShell";
 import { useEditorStore } from "../stores/editorStore";
-import type { FlowGraph } from "@createflowchart/core";
+import type { FlowGraph } from "@createflowchart/legacy";
 import type { DiagramDocument } from "@createflowchart/schema";
 
 interface CloudEditorProps {

@@ -2,8 +2,10 @@
   "extends": "../../packages/tsconfig/node.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
+    "jsx": "react-jsx",
+    "lib": ["dom", "dom.iterable", "esnext"]
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["node_modules", "dist"]
 }

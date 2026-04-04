@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { EditorShell } from "./EditorShell";
 import { useSandboxStorage } from "../hooks/use-sandbox-storage";
 import { useEditorStore } from "../stores/editorStore";
-import { createStarterFlowGraph } from "@createflowchart/core";
+import { createStarterFlowGraph } from "@createflowchart/legacy";
 
 export function SandboxEditor() {
   const { initializeSandbox, hasStoredData } = useSandboxStorage();

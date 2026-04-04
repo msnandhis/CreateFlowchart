@@ -266,7 +266,7 @@ export default function Home() {
             <span className={styles.platformCardTag}>npm package</span>
             <div className={styles.platformMono}>
               <span className={styles.cmt}>{"// "} Install the core engine</span>{"\n"}
-              <span className={styles.hl}>npm install</span> @createflowchart/core{"\n\n"}
+              <span className={styles.hl}>npm install</span> @createflowchart/legacy{"\n\n"}
               <span className={styles.cmt}>{"// "} Generate a diagram</span>{"\n"}
               <span className={styles.kw}>const</span> engine = <span className={styles.fn}>createEngine</span>();{"\n"}
               engine.<span className={styles.fn}>addNode</span>({"{ "}shape: <span className={styles.str}>&apos;process&apos;</span>{" }"});{"\n"}

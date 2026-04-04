@@ -6,7 +6,7 @@ import {
 } from "@createflowchart/db/src/schema";
 import { eq, desc, and, sql, like, or } from "drizzle-orm";
 import type { Template } from "@createflowchart/db/src/schema";
-import type { FlowGraph } from "@createflowchart/core";
+import type { FlowGraph } from "@createflowchart/legacy";
 import type { DiagramDocument } from "@createflowchart/schema";
 import {
   createPersistedFlowEnvelope,

@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@createflowchart/ai": "workspace:*",
-    "@createflowchart/core": "workspace:*",
+    "@createflowchart/legacy": "workspace:*",
     "@createflowchart/db": "workspace:*",
     "@createflowchart/dsl": "workspace:*",
     "@createflowchart/engine": "workspace:*",

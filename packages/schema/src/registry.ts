@@ -1,12 +1,12 @@
 import { z } from "zod";
 import {
-  ContainerTypeEnum,
-  DiagramFamilyEnum,
-  EdgeRoutingEnum,
-  MarkerEnum,
-  PortSideEnum,
-  ResizePolicyEnum,
-} from "./document";
+  DiagramFamilyV3 as DiagramFamilyEnum,
+  EdgeRouting as EdgeRoutingEnum,
+  MarkerType as MarkerEnum,
+  PortSide as PortSideEnum,
+  ResizePolicy as ResizePolicyEnum,
+  GroupType as ContainerTypeEnum,
+} from "./model";
 
 export const ShapeLabelZoneSchema = z.object({
   id: z.string().min(1),

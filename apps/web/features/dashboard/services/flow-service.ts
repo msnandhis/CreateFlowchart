@@ -2,8 +2,8 @@ import { db } from "@/shared/lib/db";
 import { flows, flowVersions } from "@createflowchart/db/src/schema";
 import { eq, desc } from "drizzle-orm";
 import { ZodError } from "zod";
-import type { FlowGraph } from "@createflowchart/core";
-import { FlowGraphSchema } from "@createflowchart/core";
+import type { FlowGraph } from "@createflowchart/legacy";
+import { FlowGraphSchema } from "@createflowchart/legacy";
 
 export interface FlowListItem {
   id: string;

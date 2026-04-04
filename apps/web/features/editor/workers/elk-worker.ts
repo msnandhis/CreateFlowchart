@@ -1,4 +1,4 @@
-import type { FlowGraph, FlowNode } from "@createflowchart/core";
+import type { FlowGraph, FlowNode } from "@createflowchart/legacy";
 import type { Node, Edge } from "@xyflow/react";
 
 export interface ELKNode {

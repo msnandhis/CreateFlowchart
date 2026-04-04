@@ -5,7 +5,7 @@ import { useEditorStore } from "../stores/editorStore";
 import {
   createStarterFlowGraph,
   type FlowGraph,
-} from "@createflowchart/core";
+} from "@createflowchart/legacy";
 import type { DiagramDocument } from "@createflowchart/schema";
 import { createPersistedFlowEnvelope, normalizePersistedFlow } from "../lib/persisted-flow";
 import { documentToFlowGraph } from "../lib/document-compat";

@@ -1,4 +1,4 @@
-import type { NodeType, FlowNode } from "@createflowchart/core";
+import type { NodeType, FlowNode } from "@createflowchart/legacy";
 import {
   bpmnEdges,
   bpmnLiteShapes,

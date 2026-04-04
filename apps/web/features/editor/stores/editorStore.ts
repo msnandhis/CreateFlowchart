@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { ActionConfig, FlowGraph, FlowNode } from "@createflowchart/core";
-import { createEmptyFlowGraph, validateFlowGraph } from "@createflowchart/core";
+import type { ActionConfig, FlowGraph, FlowNode } from "@createflowchart/legacy";
+import { createEmptyFlowGraph, validateFlowGraph } from "@createflowchart/legacy";
 import type { EngineState } from "@createflowchart/engine";
 import type {
   DiagramContainer,

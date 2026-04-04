@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Input } from "@/shared/ui/Input";
 import { Button } from "@/shared/ui/Button";
 import styles from "../styles/action-node.module.css";
-import type { ActionConfig } from "@createflowchart/core";
+import type { ActionConfig } from "@createflowchart/legacy";
 
 interface ActionNodeConfigPanelProps {
   nodeId: string;

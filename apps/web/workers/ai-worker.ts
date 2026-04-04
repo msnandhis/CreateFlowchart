@@ -1,6 +1,6 @@
 import type { Job } from "bullmq";
-import { FlowGraphSchema } from "@createflowchart/core";
-import type { FlowGraph } from "@createflowchart/core";
+import { FlowGraphSchema } from "@createflowchart/legacy";
+import type { FlowGraph } from "@createflowchart/legacy";
 import type { DiagramDocument } from "@createflowchart/schema";
 import { flowDslToDocument, documentToFlowDsl } from "@createflowchart/dsl";
 import type { AIGenerationJobData } from "../shared/lib/queue";

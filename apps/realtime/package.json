@@ -11,7 +11,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "@createflowchart/core": "workspace:*",
+    "@createflowchart/legacy": "workspace:*",
     "bullmq": "^5.30.0",
     "dotenv": "^16.4.0",
     "ioredis": "^5.4.0",

@@ -17,9 +17,9 @@ importers:
 
   apps/realtime:
     dependencies:
-      '@createflowchart/core':
+      '@createflowchart/legacy':
         specifier: workspace:*
-        version: link:../../packages/core
+        version: link:../../packages/legacy
       bullmq:
         specifier: ^5.30.0
         version: 5.71.1
@@ -72,9 +72,6 @@ importers:
       '@createflowchart/ai':
         specifier: workspace:*
         version: link:../../packages/ai
-      '@createflowchart/core':
-        specifier: workspace:*
-        version: link:../../packages/core
       '@createflowchart/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -84,6 +81,9 @@ importers:
       '@createflowchart/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@createflowchart/legacy':
+        specifier: workspace:*
+        version: link:../../packages/legacy
       '@createflowchart/render':
         specifier: workspace:*
         version: link:../../packages/render
@@ -212,9 +212,15 @@ importers:
 
   packages/core:
     dependencies:
-      zod:
-        specifier: ^3.24.0
-        version: 3.25.76
+      '@createflowchart/layout':
+        specifier: workspace:*
+        version: link:../layout
+      '@createflowchart/render':
+        specifier: workspace:*
+        version: link:../render
+      '@createflowchart/schema':
+        specifier: workspace:*
+        version: link:../schema
     devDependencies:
       '@createflowchart/tsconfig':
         specifier: workspace:*
@@ -222,9 +228,6 @@ importers:
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
-      vitest:
-        specifier: ^3.1.0
-        version: 3.2.4(@types/node@20.19.37)(terser@5.46.1)(tsx@4.21.0)
 
   packages/db:
     dependencies:
@@ -286,6 +289,53 @@ importers:
       '@createflowchart/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/legacy:
+    dependencies:
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
+    devDependencies:
+      '@createflowchart/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.1.0
+        version: 3.2.4(@types/node@20.19.37)(terser@5.46.1)(tsx@4.21.0)
+
+  packages/react:
+    dependencies:
+      '@createflowchart/layout':
+        specifier: workspace:*
+        version: link:../layout
+      '@createflowchart/render':
+        specifier: workspace:*
+        version: link:../render
+      '@createflowchart/schema':
+        specifier: workspace:*
+        version: link:../schema
+      react:
+        specifier: ^18.0.0 || ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^18.0.0 || ^19.0.0
+        version: 19.2.4(react@19.2.4)
+    devDependencies:
+      '@createflowchart/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      '@types/react':
+        specifier: ^18.3.12
+        version: 18.3.28
+      '@types/react-dom':
+        specifier: ^18.3.1
+        version: 18.3.7(@types/react@18.3.28)
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
@@ -1867,10 +1917,21 @@ packages:
   '@types/pg@8.20.0':
     resolution: {integrity: sha512-bEPFOaMAHTEP1EzpvHTbmwR8UsFyHSKsRisLIHVMXnpNefSbGA1bD6CVy+qKjGSqmZqNqBDV2azOBo8TgkcVow==}
 
+  '@types/prop-types@15.7.15':
+    resolution: {integrity: sha512-F6bEyamV9jKGAFBEmlQnesRPGOQqS2+Uwi0Em15xenOxHaf2hv6L8YCVn3rPdPJOiJfPiCnLIRyvwVaqMY3MIw==}
+
+  '@types/react-dom@18.3.7':
+    resolution: {integrity: sha512-MEe3UeoENYVFXzoXEWsvcpg6ZvlrFNlOQ7EOsvhI3CfAXwzPfO8Qwuxd40nepsYKqyyVQnTdEfv68q91yLcKrQ==}
+    peerDependencies:
+      '@types/react': ^18.0.0
+
   '@types/react-dom@19.2.3':
     resolution: {integrity: sha512-jp2L/eY6fn+KgVVQAOqYItbF0VY/YApe5Mz2F0aykSO8gx31bYCZyvSeYxCHKvzHG5eZjc+zyaS5BrBWya2+kQ==}
     peerDependencies:
       '@types/react': ^19.2.0
+
+  '@types/react@18.3.28':
+    resolution: {integrity: sha512-z9VXpC7MWrhfWipitjNdgCauoMLRdIILQsAEV+ZesIzBq/oUlxk0m3ApZuMFCXdnS4U7KrI+l3WRUEGQ8K1QKw==}
 
   '@types/react@19.2.14':
     resolution: {integrity: sha512-ilcTH/UniCkMdtexkoCN0bI7pMcJDvmQFPvuPvmEaYA/NSfFTAgdUSLAoVjaRJm7+6PvcM+q1zYOwS4wTYMF9w==}
@@ -5692,9 +5753,20 @@ snapshots:
       pg-protocol: 1.13.0
       pg-types: 2.2.0
 
+  '@types/prop-types@15.7.15': {}
+
+  '@types/react-dom@18.3.7(@types/react@18.3.28)':
+    dependencies:
+      '@types/react': 18.3.28
+
   '@types/react-dom@19.2.3(@types/react@19.2.14)':
     dependencies:
       '@types/react': 19.2.14
+
+  '@types/react@18.3.28':
+    dependencies:
+      '@types/prop-types': 15.7.15
+      csstype: 3.2.3
 
   '@types/react@19.2.14':
     dependencies:

@@ -6,7 +6,7 @@ import { Button } from "@/shared/ui/Button";
 import { Input } from "@/shared/ui/Input";
 import { Badge } from "@/shared/ui/Badge";
 import styles from "../styles/templates.module.css";
-import type { FlowGraph } from "@createflowchart/core";
+import type { FlowGraph } from "@createflowchart/legacy";
 import type { DiagramDocument } from "@createflowchart/schema";
 
 interface TemplateModalProps {

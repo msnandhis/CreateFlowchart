@@ -60,6 +60,29 @@ export {
   type DiagramEngineOptions,
 } from "./engine";
 
+export {
+  ShapeLabelZoneSchema,
+  ShapePortAnchorSchema,
+  ShapeDefinitionSchema,
+  EdgeDefinitionSchema,
+  ContainerDefinitionSchema,
+  DiagramKitSchema,
+  createEmptyRegistry,
+  type ShapeLabelZone,
+  type ShapePortAnchor,
+  type ShapeDefinition,
+  type EdgeDefinition,
+  type ContainerDefinition,
+  type DiagramKit,
+  type PlatformRegistry,
+} from "./registry";
+
+export { migrateLegacyFlowGraph } from "./migrate";
+export { flowchartShapes, flowchartKit } from "./presets/flowchart";
+export { bpmnLiteShapes, bpmnLiteKit } from "./presets/bpmn";
+export { containerPresets } from "./presets/containers";
+export { flowchartEdges, bpmnEdges, edgeKits } from "./presets/edges";
+
 // ═══════════════════════════════════════════════════════════════════
 // v2 API — Legacy (backward-compatible)
 // These exports support existing document.ts and registry.ts consumers.
@@ -108,27 +131,4 @@ export {
   type DiagramMetadata,
   type DiagramDocument,
 } from "./document";
-
-export {
-  ShapeLabelZoneSchema,
-  ShapePortAnchorSchema,
-  ShapeDefinitionSchema,
-  EdgeDefinitionSchema,
-  ContainerDefinitionSchema,
-  DiagramKitSchema,
-  createEmptyRegistry,
-  type ShapeLabelZone,
-  type ShapePortAnchor,
-  type ShapeDefinition,
-  type EdgeDefinition,
-  type ContainerDefinition,
-  type DiagramKit,
-  type PlatformRegistry,
-} from "./registry";
-
-export { migrateLegacyFlowGraph } from "./migrate";
-export { flowchartShapes, flowchartKit } from "./presets/flowchart";
-export { bpmnLiteShapes, bpmnLiteKit } from "./presets/bpmn";
-export { containerPresets } from "./presets/containers";
-export { flowchartEdges, bpmnEdges, edgeKits } from "./presets/edges";
 

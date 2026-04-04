@@ -1,5 +1,5 @@
 {
-  "name": "@createflowchart/core",
+  "name": "@createflowchart/legacy",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -11,23 +11,25 @@
       "default": "./dist/index.js"
     }
   },
-  "files": [
-    "dist",
-    "README.md"
-  ],
+  "files": ["dist", "README.md"],
   "sideEffects": false,
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "prepack": "pnpm run build"
+    "prepack": "pnpm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
-    "@createflowchart/schema": "workspace:*",
-    "@createflowchart/layout": "workspace:*",
-    "@createflowchart/render": "workspace:*"
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@createflowchart/tsconfig": "workspace:*",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.0"
   }
 }

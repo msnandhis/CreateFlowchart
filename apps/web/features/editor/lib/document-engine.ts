@@ -1,4 +1,4 @@
-import type { FlowNode } from "@createflowchart/core";
+import type { FlowNode } from "@createflowchart/legacy";
 import {
   addNode as addDocumentNode,
   addContainer as addDocumentContainer,
@@ -34,7 +34,7 @@ import {
   reactFlowToDocument,
 } from "./document-compat";
 import { getPaletteItemByShapeId, getShapeDefinition } from "./flowchart-shapes";
-import type { ActionConfig } from "@createflowchart/core";
+import type { ActionConfig } from "@createflowchart/legacy";
 
 export interface EditorProjection {
   engineState: EngineState;
